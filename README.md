@@ -12,3 +12,5 @@ GCP_WIF_PROVIDER
 GCP_REGION
 GCP_ARTIFACT_REGISTRY_REPO
 GCP_TERRAFORM_STATE_BUCKET
+
+toca crear un workload identity pool en GCP y una cuenta de servicio 
