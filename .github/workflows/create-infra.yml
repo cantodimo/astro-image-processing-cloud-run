@@ -23,6 +23,15 @@ jobs:
   terraform-plan:
     runs-on: ubuntu-latest
 
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_PROJECT_NUMBER: ${{ vars.GCP_PROJECT_NUMBER }}
+      GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      GCP_ARTIFACT_REGISTRY_REPO: ${{ vars.GCP_ARTIFACT_REGISTRY_REPO }}
+      GCP_TERRAFORM_STATE_BUCKET: ${{ vars.GCP_TERRAFORM_STATE_BUCKET }}
+
     defaults:
       run:
         working-directory: terraform/infra
@@ -31,16 +40,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # para que estos valores no queden en los logs ni tampoco en este paso cuando se enmascara
       - name: Mask GCP identifiers
-        env:
-          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          GCP_PROJECT_NUMBER: ${{ vars.GCP_PROJECT_NUMBER }}
-          GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
-          GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
-          GCP_REGION: ${{ vars.GCP_REGION }}
-          GCP_ARTIFACT_REGISTRY_REPO: ${{ vars.GCP_ARTIFACT_REGISTRY_REPO }}
-          GCP_TERRAFORM_STATE_BUCKET: ${{ vars.GCP_TERRAFORM_STATE_BUCKET }}
         run: |
           echo "::add-mask::$GCP_PROJECT_ID"
           echo "::add-mask::$GCP_PROJECT_NUMBER"
@@ -74,20 +74,24 @@ jobs:
     runs-on: ubuntu-latest
     environment: gcp-infrastructure
 
+    env:
+      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      GCP_PROJECT_NUMBER: ${{ vars.GCP_PROJECT_NUMBER }}
+      GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
+      GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+      GCP_REGION: ${{ vars.GCP_REGION }}
+      GCP_ARTIFACT_REGISTRY_REPO: ${{ vars.GCP_ARTIFACT_REGISTRY_REPO }}
+      GCP_TERRAFORM_STATE_BUCKET: ${{ vars.GCP_TERRAFORM_STATE_BUCKET }}
+
+    defaults:
+      run:
+        working-directory: terraform/infra
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # para que estos valores no queden en los logs ni tampoco en este paso cuando se enmascara
       - name: Mask GCP identifiers
-        env:
-          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          GCP_PROJECT_NUMBER: ${{ vars.GCP_PROJECT_NUMBER }}
-          GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
-          GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
-          GCP_REGION: ${{ vars.GCP_REGION }}
-          GCP_ARTIFACT_REGISTRY_REPO: ${{ vars.GCP_ARTIFACT_REGISTRY_REPO }}
-          GCP_TERRAFORM_STATE_BUCKET: ${{ vars.GCP_TERRAFORM_STATE_BUCKET }}
         run: |
           echo "::add-mask::$GCP_PROJECT_ID"
           echo "::add-mask::$GCP_PROJECT_NUMBER"
