@@ -1,0 +1,166 @@
+name: deploy-service-cloud-run
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - "app.py"
+      - "py_processing/**"
+      - "requirements.txt"
+      - ".github/workflows/deploy-service.yml"
+
+  workflow_dispatch:
+    inputs:
+      scale:
+        description: "Escala del logo"
+        required: false
+        default: 0.30
+        type: number
+
+      opacity:
+        description: "Opacidad del logo"
+        required: false
+        default: 0.80
+        type: number
+
+      margin:
+        description: "Margen"
+        required: false
+        default: 0.02
+        type: number
+
+      tolerance:
+        description: "Tolerancia del fondo"
+        required: false
+        default: 60
+        type: number
+
+      position:
+        description: "Posición del logo"
+        required: false
+        default: "right"
+        type: choice
+        options:
+          - right
+          - left
+
+      base_img:
+        description: "ruta en el volumen de GCS de la imagen a la que se le pondra el logo"
+        required: false
+        default: "camping.jpg"
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_PROJECT_NUMBER: ${{ secrets.GCP_PROJECT_NUMBER }}
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      GCP_WIF_PROVIDER: ${{ secrets.GCP_WIF_PROVIDER }}
+      GCP_REGION: ${{ secrets.GCP_REGION }}
+      GCP_ARTIFACT_REGISTRY_REPO: ${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}
+      GCP_TERRAFORM_STATE_BUCKET: ${{ secrets.GCP_TERRAFORM_STATE_BUCKET }}
+      GCP_BUCKET_VOLUME: ${{ secrets.GCP_BUCKET_VOLUME }}
+
+      TEST_IMAGE: ${{ inputs.base_img || 'camping.jpg' }}
+      TEST_SCALE: ${{ fromJSON(format('{0}', inputs.scale) || '0.3') }}
+      TEST_OPACITY: ${{ fromJSON(format('{0}', inputs.opacity) || '0.8') }}
+      TEST_MARGIN: ${{ fromJSON(format('{0}', inputs.margin) || '0.02') }}
+      TEST_TOLERANCE: ${{ fromJSON(format('{0}', inputs.tolerance) || '60') }}
+      TEST_POSITION: ${{ inputs.position || 'right' }}
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # para intentar ocultar info de cualquier log de salida
+      - name: Mask GCP identifiers
+        run: |
+          echo "::add-mask::$GCP_PROJECT_ID"
+          echo "::add-mask::$GCP_PROJECT_NUMBER"
+          echo "::add-mask::$GCP_SERVICE_ACCOUNT"
+          echo "::add-mask::$GCP_WIF_PROVIDER"
+          echo "::add-mask::$GCP_REGION"
+          echo "::add-mask::$GCP_ARTIFACT_REGISTRY_REPO"
+          echo "::add-mask::$GCP_TERRAFORM_STATE_BUCKET"
+          echo "::add-mask::$GCP_BUCKET_VOLUME"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Setup Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Prepare test folders
+        run: |
+          mkdir -p imagenes_base
+          mkdir -p salida_procesos
+
+      - name: Download test image
+        run: |
+          local_image="${TEST_IMAGE//\//___}"
+          gcloud storage cp \
+            "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/$TEST_IMAGE" \
+            "$GITHUB_WORKSPACE/$local_image"
+
+      - name: Download logo
+        run: |
+          gcloud storage cp \
+            "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/imagenes_base/prueba_logotipo.png" \
+            "$GITHUB_WORKSPACE/imagenes_base/prueba_logotipo.png"
+
+      # la app debe quedar corriendo en segundo plano al poner & al final
+      - name: Start Flask app
+        run: |
+          python app.py > app.log 2>&1 &
+          sleep 5
+
+      - name: Run image processing test
+        run: |
+          local_image="${TEST_IMAGE//\//___}"
+
+          curl --fail --show-error --request POST \
+            --header "Content-Type: application/json" \
+            --data '{
+              "base_path": "'"$local_image"'",
+              "scale": '"$TEST_SCALE"',
+              "opacity": '"$TEST_OPACITY"',
+              "margin": '"$TEST_MARGIN"',
+              "tolerance": '"$TEST_TOLERANCE"',
+              "bg_color": null,
+              "position": "'"$TEST_POSITION"'"
+            }' \
+            http://localhost:8080/agregar_logo_a_imagen
+
+      - name: Verify output
+        run: |
+          local_image="${TEST_IMAGE//\//___}"
+          filename=$(basename "$local_image")
+          filename_without_extension="${filename%.*}"
+          output="$GITHUB_WORKSPACE/salida_procesos/${filename_without_extension}_con_logo.jpg"
+
+          test -f "$output"
+          echo "Procesamiento exitoso"
+          echo "Archivo generado: $output"
+
+      - name: Show app log
+        if: always()
+        run: |
+          cat app.log
