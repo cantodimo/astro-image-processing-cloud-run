@@ -40,6 +40,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # para intentar ocultar info de cualquier log de salida
+      - name: Mask GCP identifiers
+        run: |
+          echo "::add-mask::$GCP_PROJECT_ID"
+          echo "::add-mask::$GCP_PROJECT_NUMBER"
+          echo "::add-mask::$GCP_SERVICE_ACCOUNT"
+          echo "::add-mask::$GCP_WIF_PROVIDER"
+          echo "::add-mask::$GCP_REGION"
+          echo "::add-mask::$GCP_ARTIFACT_REGISTRY_REPO"
+          echo "::add-mask::$GCP_TERRAFORM_STATE_BUCKET"
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
@@ -55,9 +66,9 @@ jobs:
       - name: Terraform Plan
         run: terraform plan
         env:
-          TF_VAR_project_id: $GCP_PROJECT_ID
-          TF_VAR_region: $GCP_REGION
-          TF_VAR_artifact_registry_repository_id: $GCP_ARTIFACT_REGISTRY_REPO
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_region: ${{ secrets.GCP_REGION }}
+          TF_VAR_artifact_registry_repository_id: ${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}
 
   terraform-apply:
     needs: terraform-plan
@@ -81,6 +92,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # para intentar ocultar info de cualquier log de salida
+      - name: Mask GCP identifiers
+        run: |
+          echo "::add-mask::$GCP_PROJECT_ID"
+          echo "::add-mask::$GCP_PROJECT_NUMBER"
+          echo "::add-mask::$GCP_SERVICE_ACCOUNT"
+          echo "::add-mask::$GCP_WIF_PROVIDER"
+          echo "::add-mask::$GCP_REGION"
+          echo "::add-mask::$GCP_ARTIFACT_REGISTRY_REPO"
+          echo "::add-mask::$GCP_TERRAFORM_STATE_BUCKET"
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
@@ -96,6 +118,6 @@ jobs:
       - name: Terraform Apply
         run: terraform apply -auto-approve
         env:
-          TF_VAR_project_id: $GCP_PROJECT_ID
-          TF_VAR_region: $GCP_REGION
-          TF_VAR_artifact_registry_repository_id: $GCP_ARTIFACT_REGISTRY_REPO
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_region: ${{ secrets.GCP_REGION }}
+          TF_VAR_artifact_registry_repository_id: ${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}
