@@ -24,13 +24,13 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-      GCP_PROJECT_NUMBER: ${{ vars.GCP_PROJECT_NUMBER }}
-      GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
-      GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
-      GCP_REGION: ${{ vars.GCP_REGION }}
-      GCP_ARTIFACT_REGISTRY_REPO: ${{ vars.GCP_ARTIFACT_REGISTRY_REPO }}
-      GCP_TERRAFORM_STATE_BUCKET: ${{ vars.GCP_TERRAFORM_STATE_BUCKET }}
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_PROJECT_NUMBER: ${{ secrets.GCP_PROJECT_NUMBER }}
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      GCP_WIF_PROVIDER: ${{ secrets.GCP_WIF_PROVIDER }}
+      GCP_REGION: ${{ secrets.GCP_REGION }}
+      GCP_ARTIFACT_REGISTRY_REPO: ${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}
+      GCP_TERRAFORM_STATE_BUCKET: ${{ secrets.GCP_TERRAFORM_STATE_BUCKET }}
 
     defaults:
       run:
@@ -40,34 +40,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Mask GCP identifiers
-        run: |
-          echo "::add-mask::$GCP_PROJECT_ID"
-          echo "::add-mask::$GCP_PROJECT_NUMBER"
-          echo "::add-mask::$GCP_SERVICE_ACCOUNT"
-          echo "::add-mask::$GCP_WIF_PROVIDER"
-          echo "::add-mask::$GCP_REGION"
-          echo "::add-mask::$GCP_ARTIFACT_REGISTRY_REPO"
-          echo "::add-mask::$GCP_TERRAFORM_STATE_BUCKET"
-
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
-          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
-          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        run: terraform init -backend-config="bucket=${{ vars.GCP_TERRAFORM_STATE_BUCKET }}"
+        run: terraform init -backend-config="bucket=$GCP_TERRAFORM_STATE_BUCKET"
 
       - name: Terraform Plan
         run: terraform plan
         env:
-          TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
-          TF_VAR_region: ${{ vars.GCP_REGION }}
-          TF_VAR_artifact_registry_repository_id: ${{ vars.GCP_ARTIFACT_REGISTRY_REPO }}
+          TF_VAR_project_id: $GCP_PROJECT_ID
+          TF_VAR_region: $GCP_REGION
+          TF_VAR_artifact_registry_repository_id: $GCP_ARTIFACT_REGISTRY_REPO
 
   terraform-apply:
     needs: terraform-plan
@@ -75,13 +65,13 @@ jobs:
     environment: gcp-infrastructure
 
     env:
-      GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-      GCP_PROJECT_NUMBER: ${{ vars.GCP_PROJECT_NUMBER }}
-      GCP_SERVICE_ACCOUNT: ${{ vars.GCP_SERVICE_ACCOUNT }}
-      GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
-      GCP_REGION: ${{ vars.GCP_REGION }}
-      GCP_ARTIFACT_REGISTRY_REPO: ${{ vars.GCP_ARTIFACT_REGISTRY_REPO }}
-      GCP_TERRAFORM_STATE_BUCKET: ${{ vars.GCP_TERRAFORM_STATE_BUCKET }}
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_PROJECT_NUMBER: ${{ secrets.GCP_PROJECT_NUMBER }}
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      GCP_WIF_PROVIDER: ${{ secrets.GCP_WIF_PROVIDER }}
+      GCP_REGION: ${{ secrets.GCP_REGION }}
+      GCP_ARTIFACT_REGISTRY_REPO: ${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}
+      GCP_TERRAFORM_STATE_BUCKET: ${{ secrets.GCP_TERRAFORM_STATE_BUCKET }}
 
     defaults:
       run:
@@ -91,33 +81,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Mask GCP identifiers
-        run: |
-          echo "::add-mask::$GCP_PROJECT_ID"
-          echo "::add-mask::$GCP_PROJECT_NUMBER"
-          echo "::add-mask::$GCP_SERVICE_ACCOUNT"
-          echo "::add-mask::$GCP_WIF_PROVIDER"
-          echo "::add-mask::$GCP_REGION"
-          echo "::add-mask::$GCP_ARTIFACT_REGISTRY_REPO"
-          echo "::add-mask::$GCP_TERRAFORM_STATE_BUCKET"
-
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
-          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
-          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        working-directory: terraform/infra
-        run: terraform init -backend-config="bucket=${{ vars.GCP_TERRAFORM_STATE_BUCKET }}"
+        run: terraform init -backend-config="bucket=$GCP_TERRAFORM_STATE_BUCKET"
 
       - name: Terraform Apply
-        working-directory: terraform/infra
         run: terraform apply -auto-approve
         env:
-          TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
-          TF_VAR_region: ${{ vars.GCP_REGION }}
-          TF_VAR_artifact_registry_repository_id: ${{ vars.GCP_ARTIFACT_REGISTRY_REPO }}
+          TF_VAR_project_id: $GCP_PROJECT_ID
+          TF_VAR_region: $GCP_REGION
+          TF_VAR_artifact_registry_repository_id: $GCP_ARTIFACT_REGISTRY_REPO
