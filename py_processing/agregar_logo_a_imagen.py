@@ -4,48 +4,8 @@ import os
 
 
 # =========================================================
-# CONFIGURACIÓN
+# PROCESAMIENTO
 # =========================================================
-
-# Rutas para ejecución local
-LOGO_LOCAL = r"C:/Users/Camilo/Desktop/cosas_astronomia/imagenes_base/prueba_logotipo.png"
-PATH_PREFIX_LOCAL = r"C:/Users/Camilo/Desktop/cosas_astronomia/salida_procesos/"
-
-# Ruta donde estará montado el volumen en Cloud Run
-VOLUME_PATH = "/mnt/bucket"
-
-# Rutas relativas dentro del bucket
-LOGO_CLOUD = "imagenes_base/prueba_logotipo.png"
-PATH_PREFIX_CLOUD = "salida_procesos/"
-
-
-# =========================================================
-# DETECTAR ENTORNO
-# =========================================================
-
-IS_CLOUD_RUN = "K_SERVICE" in os.environ
-
-if IS_CLOUD_RUN:
-    LOGO = os.path.join(VOLUME_PATH, LOGO_CLOUD)
-    PATH_PREFIX = os.path.join(VOLUME_PATH, PATH_PREFIX_CLOUD)
-else:
-    LOGO = LOGO_LOCAL
-    PATH_PREFIX = PATH_PREFIX_LOCAL
-
-
-def resolve_input_path(path):
-    """
-    En local:
-        devuelve la ruta de Windows tal como viene.
-
-    En Cloud Run:
-        si se recibe una ruta relativa, la busca dentro del volumen.
-    """
-
-    if IS_CLOUD_RUN and not os.path.isabs(path):
-        return os.path.join(VOLUME_PATH, path)
-
-    return path
 
 def analyze_alpha(img):
     img = img.convert("RGBA")
@@ -55,6 +15,7 @@ def analyze_alpha(img):
     transparent = int((arr == 0).sum())
     pct = 100.0 * transparent / total
     return pct, total, transparent
+
 
 def make_transparent_by_color(logo, bg_color=None, tolerance=60):
     logo = logo.convert("RGBA")
@@ -80,9 +41,10 @@ def apply_watermark(
     margin=0.02,
     tolerance=60,
     bg_color=None,
-    position="right"
+    position="right",
+    logo_path=None,
+    output_prefix=None
 ):
-
     """
     scale: ancho del logo como fracción del ancho de la imagen base
            ej. 0.2 = 20%
@@ -98,28 +60,24 @@ def apply_watermark(
         "left"  -> esquina inferior izquierda
     """
 
-    # Resolver ruta de entrada
-    base_path = resolve_input_path(base_path)
-
     # Nombre del archivo de salida
     filename = os.path.basename(base_path)
     filename_without_extension = os.path.splitext(filename)[0]
 
     out_path = os.path.join(
-        PATH_PREFIX,
+        output_prefix,
         filename_without_extension + "_con_logo.jpg"
     )
 
     # Crear directorio de salida si no existe
-    os.makedirs(PATH_PREFIX, exist_ok=True)
+    os.makedirs(output_prefix, exist_ok=True)
 
-    print("Entorno:", "Cloud Run" if IS_CLOUD_RUN else "Local")
     print("Imagen:", base_path)
-    print("Logo:", LOGO)
+    print("Logo:", logo_path)
     print("Salida:", out_path)
 
     base = Image.open(base_path).convert("RGBA")
-    logo = Image.open(LOGO)
+    logo = Image.open(logo_path)
 
     print("Logo mode original:", logo.mode)
 
@@ -223,19 +181,72 @@ def apply_watermark(
     print("Guardado:", out_path)
     return out_path
 
+
 # =========================================================
-# PRUEBA LOCAL
+# EJECUCIÓN DESDE LÍNEA DE COMANDOS
 # =========================================================
 
 if __name__ == "__main__":
-    base = r"C:/Users/Camilo/Desktop/cosas_astronomia/fotos/2026-09-25-luna_reiner_gamma/Screenshot_2026-09-26-13-12-05-201_com.miui.gallery.jpg"
+    import argparse
+
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "base",
+        help="Ruta de la imagen base"
+    )
+
+    parser.add_argument(
+        "--logo",
+        required=False,
+        default=r"C:/Users/Camilo/Desktop/cosas_astronomia/imagenes_base/prueba_logotipo.png"
+    )
+
+    parser.add_argument(
+        "--output-prefix",
+        required=False,
+        default=r"C:/Users/Camilo/Desktop/cosas_astronomia/salida_procesos/"
+    )
+
+    parser.add_argument(
+        "--scale",
+        type=float,
+        default=0.30
+    )
+
+    parser.add_argument(
+        "--opacity",
+        type=float,
+        default=0.80
+    )
+
+    parser.add_argument(
+        "--margin",
+        type=float,
+        default=0.02
+    )
+
+    parser.add_argument(
+        "--tolerance",
+        type=int,
+        default=60
+    )
+
+    parser.add_argument(
+        "--position",
+        default="right"
+    )
+
+    args = parser.parse_args()
 
     apply_watermark(
-        base,
-        scale=0.30,
-        opacity=0.80,
-        margin=0.02,
-        tolerance=60,
+        args.base,
+        scale=args.scale,
+        opacity=args.opacity,
+        margin=args.margin,
+        tolerance=args.tolerance,
         bg_color=None,
-        position="right"
+        position=args.position,
+        logo_path=args.logo,
+        output_prefix=args.output_prefix
     )
