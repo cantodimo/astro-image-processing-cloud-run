@@ -9,6 +9,8 @@ on:
       - "terraform/**"
       - ".github/workflows/create-infra.yml"
 
+  workflow_dispatch:
+
 permissions:
   contents: read
   id-token: write
