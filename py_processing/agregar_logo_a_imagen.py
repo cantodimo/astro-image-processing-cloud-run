@@ -66,7 +66,8 @@ def apply_watermark(
 
     out_path = os.path.join(
         output_prefix,
-        filename_without_extension + "_con_logo.jpg"
+        #filename_without_extension + "_con_logo.jpg"
+        filename_without_extension + "_con_logo.png"
     )
 
     # Crear directorio de salida si no existe
@@ -170,12 +171,18 @@ def apply_watermark(
     )
 
     # Guardar como JPEG
-    resultado = resultado.convert("RGB")
+    #resultado = resultado.convert("RGB")
 
+    #resultado.save(
+    #    out_path,
+    #    "JPEG",
+    #    quality=100
+    #)
+
+    # Guardar como PNG
     resultado.save(
         out_path,
-        "JPEG",
-        quality=100
+        "PNG"
     )
 
     print("Guardado:", out_path)
