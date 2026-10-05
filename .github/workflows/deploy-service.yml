@@ -149,16 +149,19 @@ jobs:
             }' \
             http://localhost:8080/agregar_logo_a_imagen
 
-      - name: Verify output
+      - name: upload output to gcs
         run: |
           local_image="${TEST_IMAGE//\//___}"
           filename=$(basename "$local_image")
           filename_without_extension="${filename%.*}"
-          output="$GITHUB_WORKSPACE/salida_procesos/${filename_without_extension}_con_logo.jpg"
+          output="${filename_without_extension}_con_logo.jpg"
 
-          test -f "$output"
-          echo "Procesamiento exitoso"
-          echo "Archivo generado: $output"
+          gcloud storage cp \
+            "$GITHUB_WORKSPACE/salida_procesos/$output" \
+            "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/salida_procesos_github_actions/$output"
+
+          echo "Archivo subido:"
+          echo "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/salida_procesos/_github_actions/$output"
 
       - name: Show app log
         if: always()
