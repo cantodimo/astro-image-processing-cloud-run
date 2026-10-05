@@ -9,6 +9,8 @@ on:
       - "app.py"
       - "py_processing/**"
       - "requirements.txt"
+      - "Dockerfile"
+      - "terraform/deploy/**"
       - ".github/workflows/deploy-service.yml"
 
   workflow_dispatch:
@@ -285,7 +287,78 @@ jobs:
           echo "Prueba Docker exitosa"
           echo "Archivo generado: $output"
 
+      - name: Push Docker image to Artifact Registry
+        run: |
+          gcloud auth configure-docker "$GCP_REGION-docker.pkg.dev" --quiet
+
+          docker tag \
+            astro-image-processing:test \
+            "$GCP_REGION-docker.pkg.dev/$GCP_PROJECT_ID/$GCP_ARTIFACT_REGISTRY_REPO/astro-image-processing:${GITHUB_SHA}"
+
+          docker push \
+            "$GCP_REGION-docker.pkg.dev/$GCP_PROJECT_ID/$GCP_ARTIFACT_REGISTRY_REPO/astro-image-processing:${GITHUB_SHA}"
+
       - name: Show Docker logs
         if: always()
         run: |
           docker logs astro-image-processing-test
+
+  deploy_cloud_run:
+    needs: docker_test
+    runs-on: ubuntu-latest
+
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_PROJECT_NUMBER: ${{ secrets.GCP_PROJECT_NUMBER }}
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      GCP_WIF_PROVIDER: ${{ secrets.GCP_WIF_PROVIDER }}
+      GCP_REGION: ${{ secrets.GCP_REGION }}
+      GCP_ARTIFACT_REGISTRY_REPO: ${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}
+      GCP_TERRAFORM_STATE_BUCKET: ${{ secrets.GCP_TERRAFORM_STATE_BUCKET }}
+      GCP_BUCKET_VOLUME: ${{ secrets.GCP_BUCKET_VOLUME }}
+
+      DOCKER_IMAGE: "${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}/astro-image-processing:${{ github.sha }}"
+
+    defaults:
+      run:
+        working-directory: terraform/deploy
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Mask GCP identifiers
+        run: |
+          echo "::add-mask::$GCP_PROJECT_ID"
+          echo "::add-mask::$GCP_PROJECT_NUMBER"
+          echo "::add-mask::$GCP_SERVICE_ACCOUNT"
+          echo "::add-mask::$GCP_WIF_PROVIDER"
+          echo "::add-mask::$GCP_REGION"
+          echo "::add-mask::$GCP_ARTIFACT_REGISTRY_REPO"
+          echo "::add-mask::$GCP_TERRAFORM_STATE_BUCKET"
+          echo "::add-mask::$GCP_BUCKET_VOLUME"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="bucket=$GCP_TERRAFORM_STATE_BUCKET"
+
+      - name: Terraform Apply
+        run: |
+          terraform apply \
+            -auto-approve
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          TF_VAR_region: ${{ secrets.GCP_REGION }}
+          TF_VAR_docker_image: ${{ env.DOCKER_IMAGE }}
+          TF_VAR_gcs_bucket: ${{ secrets.GCP_BUCKET_VOLUME }}

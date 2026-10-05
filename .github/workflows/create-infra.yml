@@ -6,7 +6,7 @@ on:
       - dev
       - main
     paths:
-      - "terraform/**"
+      - "terraform/infra/**"
       - ".github/workflows/create-infra.yml"
 
   workflow_dispatch:
