@@ -6,10 +6,7 @@ on:
       - dev
       - main
     paths:
-      - "app.py"
-      - "py_processing/**"
-      - "requirements.txt"
-      - "Dockerfile"
+      - "servicios/astro-image-processing/**"
       - "terraform/deploy/**"
       - ".github/workflows/deploy-service.yml"
 
@@ -113,6 +110,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v3
 
       - name: Install Python dependencies
+        working-directory: servicios/astro-image-processing
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
@@ -159,6 +157,7 @@ jobs:
           echo "LOCAL_IMAGE=$local_image" >> "$GITHUB_ENV"
 
       - name: Download logo
+        working-directory: servicios/astro-image-processing
         if: env.TEST_MODE == 'logo' || env.TEST_MODE == 'ambos'
         run: |
           gcloud storage cp \
@@ -167,6 +166,7 @@ jobs:
 
       # la app debe quedar corriendo en segundo plano
       - name: Start Flask app
+        working-directory: servicios/astro-image-processing
         run: |
           python app.py > app.log 2>&1 &
           sleep 5
@@ -233,7 +233,7 @@ jobs:
 
           TEXT_OUTPUT="${text_filename_without_extension}_con_texto.png"
 
-          test -f "$GITHUB_WORKSPACE/salida_procesos/$LOGO_OUTPUT"
+          test -f "$GITHUB_WORKSPACE/salida_procesos/$TEXT_OUTPUT"
           echo "Prueba de texto exitosa"
 
           echo "Salida del texto:"
@@ -267,6 +267,7 @@ jobs:
           echo "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/salida_procesos_github_actions/$output"
 
       - name: Show app log
+        working-directory: servicios/astro-image-processing
         if: always()
         run: |
           cat app.log
@@ -288,13 +289,7 @@ jobs:
       GCP_ARTIFACT_REGISTRY_REPO: ${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}
       GCP_TERRAFORM_STATE_BUCKET: ${{ secrets.GCP_TERRAFORM_STATE_BUCKET }}
       GCP_BUCKET_VOLUME: ${{ secrets.GCP_BUCKET_VOLUME }}
-
-      TEST_IMAGE: ${{ inputs.base_img || 'camping.jpg' }}
-      TEST_SCALE: ${{ fromJSON(format('{0}', inputs.scale) || '0.3') }}
-      TEST_OPACITY: ${{ fromJSON(format('{0}', inputs.opacity) || '0.8') }}
-      TEST_MARGIN: ${{ fromJSON(format('{0}', inputs.margin) || '0.02') }}
-      TEST_TOLERANCE: ${{ fromJSON(format('{0}', inputs.tolerance) || '60') }}
-      TEST_POSITION: ${{ inputs.position || 'right' }}
+      LOGO_PAYLOAD: ${{ inputs.logo_payload }}
 
     steps:
 
@@ -328,7 +323,9 @@ jobs:
           mkdir -p salida_procesos
 
       - name: Download test image
+        working-directory: servicios/astro-image-processing
         run: |
+          TEST_IMAGE=$(echo "$LOGO_PAYLOAD" | jq -r '.base_path')
           local_image="${TEST_IMAGE//\//___}"
 
           gcloud storage cp \
@@ -342,12 +339,14 @@ jobs:
             "$GITHUB_WORKSPACE/imagenes_base/prueba_logotipo.png"
 
       - name: Build Docker image
+        working-directory: servicios/astro-image-processing
         run: |
           docker build \
             -t astro-image-processing:test \
             .
 
       - name: Start Docker container
+        working-directory: servicios/astro-image-processing
         run: |
           docker run \
           -d \
@@ -360,25 +359,26 @@ jobs:
           sleep 5
 
       - name: Run Docker image processing test
+        working-directory: servicios/astro-image-processing
         run: |
+          TEST_IMAGE=$(echo "$LOGO_PAYLOAD" | jq -r '.base_path')
           local_image="${TEST_IMAGE//\//___}"
+
+          logo_payload=$(echo "$LOGO_PAYLOAD" | jq \
+            --arg image "$local_image" \
+            '.base_path = $image')
 
           curl --fail --show-error --request POST \
             --header "Content-Type: application/json" \
-            --data '{
-              "base_path": "'"$local_image"'",
-              "scale": '"$TEST_SCALE"',
-              "opacity": '"$TEST_OPACITY"',
-              "margin": '"$TEST_MARGIN"',
-              "tolerance": '"$TEST_TOLERANCE"',
-              "bg_color": null,
-              "position": "'"$TEST_POSITION"'"
-            }' \
+            --data "$logo_payload" \
             http://localhost:8080/agregar_logo_a_imagen
 
       - name: Verify Docker output
+        working-directory: servicios/astro-image-processing
         run: |
+          TEST_IMAGE=$(echo "$LOGO_PAYLOAD" | jq -r '.base_path')
           local_image="${TEST_IMAGE//\//___}"
+
           filename=$(basename "$local_image")
           filename_without_extension="${filename%.*}"
 
@@ -390,6 +390,7 @@ jobs:
           echo "Archivo generado: $output"
 
       - name: Push Docker image to Artifact Registry
+        working-directory: servicios/astro-image-processing
         run: |
           gcloud auth configure-docker "$GCP_REGION-docker.pkg.dev" --quiet
 
@@ -401,6 +402,7 @@ jobs:
             "$GCP_REGION-docker.pkg.dev/$GCP_PROJECT_ID/$GCP_ARTIFACT_REGISTRY_REPO/astro-image-processing:${GITHUB_SHA}"
 
       - name: Show Docker logs
+        working-directory: servicios/astro-image-processing
         if: always()
         run: |
           docker logs astro-image-processing-test

@@ -2,7 +2,7 @@ from PIL import Image
 import numpy as np
 import os
 
-
+#python agregar_logo_a_imagen.py "C:/Users/Camilo/Desktop/cosas_astronomia/fotos/2026-09-25-luna_reiner_gamma/reiner_gamma_nasa.jpg"
 # =========================================================
 # PROCESAMIENTO
 # =========================================================
