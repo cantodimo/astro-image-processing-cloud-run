@@ -25,6 +25,12 @@ on:
           - texto
           - ambos
 
+      solo_test:
+        description: "Ejecutar solamente las pruebas Python"
+        required: true
+        default: true
+        type: boolean
+
       logo_payload:
         description: "JSON para /agregar_logo_a_imagen"
         required: true
@@ -51,7 +57,8 @@ on:
             "color": "skyblue",
             "position": ["center", "top"],
             "margin": 0.05,
-            "max_width_pct": 0.92
+            "max_width_pct": 0.92,
+            "font_path": "CrayonLibre-Regular.ttf"
           }
         type: string
 
@@ -267,6 +274,7 @@ jobs:
   docker_test:
     needs: test-app-python
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.solo_test == false
 
     #para que quede pausado esperando aprobacion y poder primero ver si la prueba de codigo python quedo bien
     environment: gcp-infrastructure 
@@ -400,6 +408,7 @@ jobs:
   deploy_cloud_run:
     needs: docker_test
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.solo_test == false
 
     env:
       GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}

@@ -27,16 +27,12 @@ def render_text_image(
     """
 
     # Crear fuente
-    try:
-        if font_path and os.path.isfile(font_path):
-            font = ImageFont.truetype(font_path, fontsize_px)
-        else:
-            try:
-                font = ImageFont.truetype("arial.ttf", fontsize_px)
-            except Exception:
-                font = ImageFont.load_default()
-    except Exception:
-        font = ImageFont.load_default()
+    font_path = os.path.join(
+       os.path.dirname(os.path.abspath(__file__)),
+        "fonts",
+        font_path
+    )
+    font = ImageFont.truetype(font_path, fontsize_px)
 
     # Imagen auxiliar para medir texto
     dummy_img = Image.new("RGBA", (10, 10))
@@ -77,6 +73,7 @@ def render_text_image(
 
     max_line_w = 0
     line_heights = []
+    line_bboxes = []
 
     for ln in lines:
 
@@ -86,6 +83,7 @@ def render_text_image(
         h_px = bbox[3] - bbox[1]
 
         line_heights.append(h_px)
+        line_bboxes.append(bbox)
 
         if w_px > max_line_w:
             max_line_w = w_px
@@ -123,8 +121,13 @@ def render_text_image(
 
     for i, ln in enumerate(lines):
 
+        bbox = line_bboxes[i]
+
         draw.text(
-            (padding, y),
+            (
+                padding - bbox[0],
+                y - bbox[1]
+            ),
             ln,
             font=font,
             fill=color
@@ -139,7 +142,7 @@ def add_text_to_image(
     image_path,
     output_prefix=None,
     text="Texto de ejemplo",
-    font_path=None,
+    font_path="CrayonLibre-Regular.ttf",
     fontsize=0.05,
     color="white",
     bg_color=None,
@@ -327,8 +330,18 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--font-path",
-        default=None,
-        help="Ruta al archivo .ttf"
+        default="Scabber.ttf",
+        help="""Ruta al archivo .ttf
+        AlphaProta-Italic.ttf    letra imprenta rara
+        Jupiteroid-Regular.ttf   letra imprenta
+        OSerif-Regular.ttf    mayusculas
+        Scabber.ttf     linea gruesa
+        ErraticCursive-Regular.ttf   cursiva casi ilegible
+        OperationNapalm-Regular.ttf   parece letras de molde
+        MatrixTypeDisplay-Regular.ttf   retro
+        HomeVideo-Regular.ttf     retro
+        CrayonLibre-Regular.ttf   informal sin ser cursiva
+        """
     )
 
     parser.add_argument(
