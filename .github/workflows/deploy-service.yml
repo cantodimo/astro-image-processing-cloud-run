@@ -6,10 +6,9 @@ on:
       - dev
       - main
     paths:
-      - "app.py"
-      - "py_processing/**"
-      - "requirements.txt"
-      - "Dockerfile"
+      - "servicios/astro_image_processing/**"
+      - "tests/**"
+      - "pytest.ini"
       - "terraform/deploy/**"
       - ".github/workflows/deploy-service.yml"
 
@@ -18,15 +17,15 @@ on:
       endpoint:
         description: "Prueba que se quiere ejecutar"
         required: true
-        default: "ambos"
+        default: "integracion"
         type: choice
         options:
           - logo
           - texto
-          - ambos
+          - integracion
 
       solo_test:
-        description: "Ejecutar solamente las pruebas Python"
+        description: "Ejecutar solamente los tests"
         required: true
         default: true
         type: boolean
@@ -80,18 +79,17 @@ jobs:
       GCP_TERRAFORM_STATE_BUCKET: ${{ secrets.GCP_TERRAFORM_STATE_BUCKET }}
       GCP_BUCKET_VOLUME: ${{ secrets.GCP_BUCKET_VOLUME }}
 
-      TEST_MODE: ${{ inputs.endpoint || 'ambos' }}
+      TEST_MODE: ${{ inputs.endpoint || 'integracion' }}
 
       LOGO_PAYLOAD: ${{ inputs.logo_payload || '{"base_path":"camping.jpg","scale":0.30,"opacity":0.80,"margin":0.02,"tolerance":60,"bg_color":null,"position":"right"}' }}
 
-      TEXT_PAYLOAD: ${{ inputs.texto_payload || '{"image_path":"camping.jpg","text":"Foto de la NASA","fontsize":0.03,"color":"skyblue","position":["center","top"],"margin":0.05,"max_width_pct":0.92}' }}
+      TEXT_PAYLOAD: ${{ inputs.texto_payload || '{"image_path":"camping.jpg","text":"Foto de la NASA","fontsize":0.03,"color":"skyblue","position":["center","top"],"margin":0.05,"max_width_pct":0.92,"font_path":"CrayonLibre-Regular.ttf"}' }}
 
     steps:
 
       - name: Checkout
         uses: actions/checkout@v4
 
-      # para intentar ocultar info de cualquier log de salida
       - name: Mask GCP identifiers
         run: |
           echo "::add-mask::$GCP_PROJECT_ID"
@@ -113,6 +111,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v3
 
       - name: Install Python dependencies
+        working-directory: servicios/astro_image_processing
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
@@ -121,7 +120,7 @@ jobs:
         run: |
           mkdir -p imagenes_base
           mkdir -p salida_procesos
-        #rm -f salida_procesos/*  toca verificar bien el test que no se interfieran entre las pruebas
+          rm -f salida_procesos/*
 
       - name: Validate JSON payloads
         run: |
@@ -131,145 +130,45 @@ jobs:
           echo "JSON de logo válido"
           echo "JSON de texto válido"
 
-      - name: Determine test image
-        run: |
-          if [ "$TEST_MODE" = "texto" ]; then
-            TEST_IMAGE=$(echo "$TEXT_PAYLOAD" | jq -r '.image_path')
-          else
-            TEST_IMAGE=$(echo "$LOGO_PAYLOAD" | jq -r '.base_path')
-          fi
-
-          if [ -z "$TEST_IMAGE" ] || [ "$TEST_IMAGE" = "null" ]; then
-            echo "No se encontró la ruta de la imagen de prueba."
-            exit 1
-          fi
-
-          echo "Imagen de prueba: $TEST_IMAGE"
-
-          echo "TEST_IMAGE=$TEST_IMAGE" >> "$GITHUB_ENV"
-
-      - name: Download test image
-        run: |
-          local_image="${TEST_IMAGE//\//___}"
-
-          gcloud storage cp \
-            "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/$TEST_IMAGE" \
-            "$GITHUB_WORKSPACE/$local_image"
-
-          echo "LOCAL_IMAGE=$local_image" >> "$GITHUB_ENV"
-
-      - name: Download logo
-        if: env.TEST_MODE == 'logo' || env.TEST_MODE == 'ambos'
-        run: |
-          gcloud storage cp \
-            "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/imagenes_base/prueba_logotipo.png" \
-            "$GITHUB_WORKSPACE/imagenes_base/prueba_logotipo.png"
-
-      # la app debe quedar corriendo en segundo plano
-      - name: Start Flask app
-        run: |
-          python app.py > app.log 2>&1 &
-          sleep 5
-
-      - name: Run logo test
-        if: env.TEST_MODE == 'logo' || env.TEST_MODE == 'ambos'
-        run: |
-
-          logo_payload=$(echo "$LOGO_PAYLOAD" | jq \
-            --arg image "$LOCAL_IMAGE" \
-            '.base_path = $image')
-
-          echo "Ejecutando /agregar_logo_a_imagen"
-
-          curl --fail --show-error --request POST \
-            --header "Content-Type: application/json" \
-            --data "$logo_payload" \
-            http://localhost:8080/agregar_logo_a_imagen
-
-          filename=$(basename "$LOCAL_IMAGE")
-          filename_without_extension="${filename%.*}"
-
-          LOGO_OUTPUT="${filename_without_extension}_con_logo.png"
-
-          test -f "$GITHUB_WORKSPACE/salida_procesos/$LOGO_OUTPUT"
-          echo "Prueba de logo exitosa"
-
-          echo "Salida del logo:"
-          echo "$LOGO_OUTPUT"
-
-          echo "LOGO_OUTPUT=$LOGO_OUTPUT" >> "$GITHUB_ENV"
-
-      - name: Run text test
-        if: env.TEST_MODE == 'texto' || env.TEST_MODE == 'ambos'
-        run: |
-
-          if [ "$TEST_MODE" = "ambos" ]; then
-
-            # La salida del logo está dentro de salida_procesos.
-            # Por eso esta es la ruta que debe recibir app.py.
-            TEXT_INPUT="salida_procesos/$LOGO_OUTPUT"
-
-          else
-
-            # Para texto solamente se utiliza la imagen descargada.
-            TEXT_INPUT="$LOCAL_IMAGE"
-
-          fi
-
-          text_payload=$(echo "$TEXT_PAYLOAD" | jq \
-            --arg image "$TEXT_INPUT" \
-            '.image_path = $image')
-
-          echo "Ejecutando /poner_texto_a_imagen"
-          echo "Imagen de entrada del texto: $TEXT_INPUT"
-
-          curl --fail --show-error --request POST \
-            --header "Content-Type: application/json" \
-            --data "$text_payload" \
-            http://localhost:8080/poner_texto_a_imagen
-
-          text_filename=$(basename "$TEXT_INPUT")
-          text_filename_without_extension="${text_filename%.*}"
-
-          TEXT_OUTPUT="${text_filename_without_extension}_con_texto.png"
-
-          test -f "$GITHUB_WORKSPACE/salida_procesos/$LOGO_OUTPUT"
-          echo "Prueba de texto exitosa"
-
-          echo "Salida del texto:"
-          echo "$TEXT_OUTPUT"
-
-          echo "TEXT_OUTPUT=$TEXT_OUTPUT" >> "$GITHUB_ENV"
-
-      - name: Upload logo output to GCS
-        if: env.TEST_MODE == 'logo'
-        run: |
-          gcloud storage cp \
-            "$GITHUB_WORKSPACE/salida_procesos/$LOGO_OUTPUT" \
-            "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/salida_procesos_github_actions/$LOGO_OUTPUT"
-
-          echo "Archivo subido:"
-          echo "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/salida_procesos_github_actions/$LOGO_OUTPUT"
-
-      - name: Upload output to GCS
+      - name: Run pytest
+        env:
+          PYTHONPATH: ${{ github.workspace }}/servicios/astro_image_processing
         run: |
           if [ "$TEST_MODE" = "logo" ]; then
-          output="$LOGO_OUTPUT"
-          else
-            output="$TEXT_OUTPUT"
+
+            echo "Ejecutando pruebas de logo"
+            pytest tests/ -m logo -v
+
+          elif [ "$TEST_MODE" = "texto" ]; then
+
+            echo "Ejecutando pruebas de texto"
+            pytest tests/ -m texto -v
+
+          elif [ "$TEST_MODE" = "integracion" ]; then
+
+            echo "Ejecutando prueba de integración: logo -> texto"
+            pytest tests/ -m integration -v
+
           fi
 
-          gcloud storage cp \
-            "$GITHUB_WORKSPACE/salida_procesos/$output" \
-            "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/salida_procesos_github_actions/$output"
-
-          echo "Archivo subido:"
-          echo "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/salida_procesos_github_actions/$output"
-
-      - name: Show app log
-        if: always()
+      - name: Upload outputs to GCS
+        if: success()
         run: |
-          cat app.log
+          if compgen -G "$GITHUB_WORKSPACE/salida_procesos/*" > /dev/null; then
+
+            gcloud storage cp \
+              "$GITHUB_WORKSPACE/salida_procesos/"* \
+              "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/salida_procesos_github_actions/"
+
+            echo "Archivos subidos a:"
+            echo "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/salida_procesos_github_actions/"
+
+          else
+
+            echo "No se generaron archivos en salida_procesos."
+            exit 1
+
+          fi
           
   docker_test:
     needs: test-app-python
@@ -288,13 +187,7 @@ jobs:
       GCP_ARTIFACT_REGISTRY_REPO: ${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}
       GCP_TERRAFORM_STATE_BUCKET: ${{ secrets.GCP_TERRAFORM_STATE_BUCKET }}
       GCP_BUCKET_VOLUME: ${{ secrets.GCP_BUCKET_VOLUME }}
-
-      TEST_IMAGE: ${{ inputs.base_img || 'camping.jpg' }}
-      TEST_SCALE: ${{ fromJSON(format('{0}', inputs.scale) || '0.3') }}
-      TEST_OPACITY: ${{ fromJSON(format('{0}', inputs.opacity) || '0.8') }}
-      TEST_MARGIN: ${{ fromJSON(format('{0}', inputs.margin) || '0.02') }}
-      TEST_TOLERANCE: ${{ fromJSON(format('{0}', inputs.tolerance) || '60') }}
-      TEST_POSITION: ${{ inputs.position || 'right' }}
+      LOGO_PAYLOAD: ${{ inputs.logo_payload }}
 
     steps:
 
@@ -328,7 +221,9 @@ jobs:
           mkdir -p salida_procesos
 
       - name: Download test image
+        working-directory: servicios/astro_image_processing
         run: |
+          TEST_IMAGE=$(echo "$LOGO_PAYLOAD" | jq -r '.base_path')
           local_image="${TEST_IMAGE//\//___}"
 
           gcloud storage cp \
@@ -342,12 +237,14 @@ jobs:
             "$GITHUB_WORKSPACE/imagenes_base/prueba_logotipo.png"
 
       - name: Build Docker image
+        working-directory: servicios/astro_image_processing
         run: |
           docker build \
             -t astro-image-processing:test \
             .
 
       - name: Start Docker container
+        working-directory: servicios/astro_image_processing
         run: |
           docker run \
           -d \
@@ -360,25 +257,26 @@ jobs:
           sleep 5
 
       - name: Run Docker image processing test
+        working-directory: servicios/astro_image_processing
         run: |
+          TEST_IMAGE=$(echo "$LOGO_PAYLOAD" | jq -r '.base_path')
           local_image="${TEST_IMAGE//\//___}"
+
+          logo_payload=$(echo "$LOGO_PAYLOAD" | jq \
+            --arg image "$local_image" \
+            '.base_path = $image')
 
           curl --fail --show-error --request POST \
             --header "Content-Type: application/json" \
-            --data '{
-              "base_path": "'"$local_image"'",
-              "scale": '"$TEST_SCALE"',
-              "opacity": '"$TEST_OPACITY"',
-              "margin": '"$TEST_MARGIN"',
-              "tolerance": '"$TEST_TOLERANCE"',
-              "bg_color": null,
-              "position": "'"$TEST_POSITION"'"
-            }' \
+            --data "$logo_payload" \
             http://localhost:8080/agregar_logo_a_imagen
 
       - name: Verify Docker output
+        working-directory: servicios/astro_image_processing
         run: |
+          TEST_IMAGE=$(echo "$LOGO_PAYLOAD" | jq -r '.base_path')
           local_image="${TEST_IMAGE//\//___}"
+
           filename=$(basename "$local_image")
           filename_without_extension="${filename%.*}"
 
@@ -390,6 +288,7 @@ jobs:
           echo "Archivo generado: $output"
 
       - name: Push Docker image to Artifact Registry
+        working-directory: servicios/astro_image_processing
         run: |
           gcloud auth configure-docker "$GCP_REGION-docker.pkg.dev" --quiet
 
@@ -401,6 +300,7 @@ jobs:
             "$GCP_REGION-docker.pkg.dev/$GCP_PROJECT_ID/$GCP_ARTIFACT_REGISTRY_REPO/astro-image-processing:${GITHUB_SHA}"
 
       - name: Show Docker logs
+        working-directory: servicios/astro_image_processing
         if: always()
         run: |
           docker logs astro-image-processing-test

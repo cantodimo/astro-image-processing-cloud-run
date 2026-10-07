@@ -9,13 +9,11 @@ app = Flask(__name__)
 ## comentario para probar disparo workflow solo con modificar este archivo
 @app.route("/agregar_logo_a_imagen", methods=["POST"])
 def agregar_logo():
-    """{ "base_path": "Screenshot_2026-09-26-13-12-05-201_com.miui.gallery.jpg",
-        "scale": 0.30,
-        "opacity": 0.80,
-        "margin": 0.02,
-        "tolerance": 60,
-        "bg_color": null,
-        "position":"right"}"""
+    """curl --request POST ^
+  --header "Content-Type: application/json" ^
+  --data "{\"base_path\":\"C:/Users/Camilo/Desktop/cosas_astronomia/fotos/2026-09-25-luna_reiner_gamma/reiner_gamma_nasa.jpg\",\"scale\":0.30,\"opacity\":0.80,\"margin\":0.02,\"tolerance\":60,\"bg_color\":null,\"position\":\"right\"}" ^
+  http://localhost:8080/agregar_logo_a_imagen"""
+
     parametros = request.get_json()
     if "K_SERVICE" in os.environ:
         # Cloud Run
@@ -48,15 +46,10 @@ def agregar_logo():
 @app.route("/poner_texto_a_imagen", methods=["POST"])
 def ruta_poner_texto_a_imagen():
     """
-    {
-  "image_path": "camping.jpg",
-  "text": "texto de prueba",
-  "fontsize": 0.03,
-  "color": "skyblue",
-  "position": ["center", "top"],
-  "margin": 0.05,
-  "max_width_pct": 0.92
-}
+    curl --request POST ^
+  --header "Content-Type: application/json" ^
+  --data "{\"image_path\":\"C:/Users/Camilo/Desktop/cosas_astronomia/fotos/2026-09-25-luna_reiner_gamma/reiner_gamma_nasa.jpg\",\"text\":\"Foto de la NASA\",\"fontsize\":0.03,\"color\":\"skyblue\",\"position\":[\"center\",\"top\"],\"margin\":0.05,\"max_width_pct\":0.92,\"font_path\":\"Jupiteroid-Regular.ttf\"}" ^
+  http://localhost:8080/poner_texto_a_imagen
     """
     parametros = request.get_json()
     if isinstance(parametros.get("position"), list):
