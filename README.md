@@ -1,16 +1,117 @@
-# astro-image-processing-cloud-run
-servicio para agregar logo a imagenes, acomodar tamaño pa publicar en instagram, poner textos en imagenes.
+# 🌌 Astro Image Processing
 
------
-configurar estos secrets de repo de actions en github
-para prueba local crearlas como variables de entorno con prefijo TF_VAR... con el nombre de la variable de terraform real, osea TF_VAR_region por ejemplo
+Servicio de procesamiento de imágenes desarrollado para un caso de uso específico personal de fotos de astronomia
 
-GCP_PROJECT_ID
-GCP_PROJECT_NUMBER
-GCP_SERVICE_ACCOUNT
-GCP_WIF_PROVIDER
-GCP_REGION
-GCP_ARTIFACT_REGISTRY_REPO
-GCP_TERRAFORM_STATE_BUCKET
+La aplicación proporciona una API para realizar diferentes procesos sobre imágenes y utiliza **Google Cloud** como infraestructura de ejecución y almacenamiento.
 
-toca crear un workload identity pool en GCP y una cuenta de servicio 
+---
+
+## 🏗️ Arquitectura
+
+```text
+                    ┌─────────────────┐
+                    │     GitHub      │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │ GitHub Actions  │
+                    │                 │
+                    │ Tests / Build   │
+                    │ / Deploy        │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │    Artifact     │
+                    │    Registry     │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │    Cloud Run    │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │ Cloud Storage   │
+                    └─────────────────┘
+```
+
+La infraestructura de Google Cloud se administra mediante **Terraform**.
+
+---
+
+## ✨ Funcionalidades
+
+* 🖼️ Agregar logos a imágenes.
+* ✏️ Agregar texto a imágenes.
+* 🧪 Pruebas funcionales y de integración con **pytest**.
+* 🚀 Automatización de pruebas y despliegue mediante **GitHub Actions**.
+
+---
+
+## 📁 Estructura del proyecto
+
+```text
+astro-image-processing-cloud-run/
+│
+├── servicios/
+│   └── astro_image_processing/
+│       ├── app.py
+│       ├── Dockerfile
+│       ├── requirements.txt
+│       └── py_processing/
+│
+├── tests/
+│   └── astro_image_processing/
+│       ├── test_logo.py
+│       ├── test_texto.py
+│       └── test_integracion.py
+│
+├── terraform/
+│   ├── infra/
+│   └── deploy/
+│
+├── .github/
+│   └── workflows/
+│
+│
+└── README.md
+```
+
+---
+
+## 🛠️ Tecnologías
+
+| Tecnología            | Uso                       |
+| --------------------- | ------------------------- |
+| **Python / Flask**    | API y procesamiento       |
+| **Pillow / NumPy**    | Procesamiento de imágenes |
+| **pytest**            | Pruebas                   |
+| **Docker**            | Contenedorización         |
+| **GitHub Actions**    | Automatización            |
+| **Google Cloud Run**  | Ejecución del servicio    |
+| **Cloud Storage**     | Almacenamiento            |
+| **Artifact Registry** | Imágenes Docker           |
+| **Terraform**         | Infraestructura           |
+
+---
+
+## 🔐 Autenticación
+
+GitHub Actions utiliza **Workload Identity Federation** para acceder a Google Cloud sin almacenar claves privadas de cuentas de servicio en GitHub.
+
+---
+
+## ☁️ Google Cloud
+
+El servicio se ejecuta en **Cloud Run**, utilizando una imagen almacenada en **Artifact Registry** y archivos almacenados en **Cloud Storage** usando Cloud Storage volume mount.
+
+La infraestructura se define y administra mediante **Terraform**.
+
+---
+
+## 📌 Estado
+
+Proyecto en desarrollo.
