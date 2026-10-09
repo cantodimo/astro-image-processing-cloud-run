@@ -1,0 +1,130 @@
+name: deploy-job-cloud-run
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - "jobs/astro_video_processing/**"
+      - "tests/jobs/astro_video_processing/**"
+      - "test_setup/jobs/astro_video_processing/**"
+      - ".github/workflows/deploy-jobs.yml"
+
+  workflow_dispatch:
+    inputs:
+      solo_test:
+        description: "Ejecutar solamente los tests"
+        required: true
+        default: true
+        type: boolean
+
+      #TODO: hacer que este payload salga de alguna configuracion de tests
+      job_payload:
+        description: "parametros de la prueba"
+        required: true
+        default: |
+          { 
+            "video": "VID_20260925_202317.mp4",
+            "scale": 0.30,
+            "opacity": 0.40,
+            "margin": 0.02,
+            "tolerance": 60,
+            "fps": 30,
+            "target_width": 1080,
+            "target_height": 1920,
+            "position": "right"
+          }
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  test-app-python:
+    runs-on: ubuntu-latest
+
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_PROJECT_NUMBER: ${{ secrets.GCP_PROJECT_NUMBER }}
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      GCP_WIF_PROVIDER: ${{ secrets.GCP_WIF_PROVIDER }}
+      GCP_REGION: ${{ secrets.GCP_REGION }}
+      GCP_ARTIFACT_REGISTRY_REPO: ${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}
+      GCP_TERRAFORM_STATE_BUCKET: ${{ secrets.GCP_TERRAFORM_STATE_BUCKET }}
+      GCP_BUCKET_VOLUME: ${{ secrets.GCP_BUCKET_VOLUME }}
+
+      JOB_PAYLOAD: ${{ inputs.job_payload || '{"video":"VID_20260925_202317.mp4","scale":0.30,"opacity":0.40,"margin":0.02,"fps":30,"target_width":1080,"target_height":1920,"position":"right"}' }}
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Mask GCP identifiers
+        run: |
+          echo "::add-mask::$GCP_PROJECT_ID"
+          echo "::add-mask::$GCP_PROJECT_NUMBER"
+          echo "::add-mask::$GCP_SERVICE_ACCOUNT"
+          echo "::add-mask::$GCP_WIF_PROVIDER"
+          echo "::add-mask::$GCP_REGION"
+          echo "::add-mask::$GCP_ARTIFACT_REGISTRY_REPO"
+          echo "::add-mask::$GCP_TERRAFORM_STATE_BUCKET"
+          echo "::add-mask::$GCP_BUCKET_VOLUME"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Setup Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      #TODO: hacer que esto sea dinamico segun el job a probar
+      - name: Install test dependencies
+        working-directory: test_setup/jobs/astro_video_processing
+        shell: bash
+        run: |
+          SCRIPT="./test_dependencies.sh"
+
+          if [ -f "$SCRIPT" ]; then
+            bash "$SCRIPT"
+          else
+            echo "No se encontró: $PWD/$SCRIPT"
+            exit 1
+          fi
+
+      - name: Prepare test folders
+        run: |
+          mkdir -p imagenes_base
+          mkdir -p salida_procesos
+
+      #TODO: hacer que se ejecute tests de un job en especifico segun los jobs editados, crear un flujo por cada job editado en el commit
+      - name: Run pytest
+        run: |
+            echo "Ejecutando pruebas de logo"
+            pytest -c tests/jobs/astro_video_processing/pytest.ini \
+              tests/jobs/astro_video_processing/
+
+      #TODO: hacer este prefijo dinamico segun el job editado
+      - name: Upload outputs to GCS
+        if: success()
+        run: |
+          if compgen -G "$GITHUB_WORKSPACE/salida_procesos/*" > /dev/null; then
+            
+            PREFIJO="jobs/astro_video_processing"
+            gcloud storage cp \
+              "$GITHUB_WORKSPACE/salida_procesos/"* \
+              "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/salida_procesos_github_actions/$PREFIJO/"
+
+            echo "Archivos subidos a:"
+            echo "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/salida_procesos_github_actions/$PREFIJO/"
+
+          else
+
+            echo "No se generaron archivos en salida_procesos."
+            exit 1
+
+          fi

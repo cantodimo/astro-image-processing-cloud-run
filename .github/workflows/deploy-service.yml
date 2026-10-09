@@ -7,10 +7,10 @@ on:
       - main
     paths:
       - "servicios/astro_image_processing/**"
-      - "tests/**"
-      - "pytest.ini"
+      - "tests/astro_image_processing/**"
+      #- "pytest.ini"
       - "terraform/deploy/**"
-      - ".github/workflows/deploy-service.yml"
+      #- ".github/workflows/deploy-service.yml"
 
   workflow_dispatch:
     inputs:
