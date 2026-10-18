@@ -56,18 +56,84 @@ FILTER_COMPLEX="[0:v]scale=${TARGET_WIDTH}:${TARGET_HEIGHT},setsar=1[video];${LO
 
 echo "Procesando video..."
 
+# Inspeccionar el primer flujo de video.
+SOURCE_INFO=$(ffprobe -v error -select_streams v:0 \
+    -show_entries stream=codec_name,profile,pix_fmt,level,bit_rate,avg_frame_rate,r_frame_rate \
+    -of default=noprint_wrappers=1 "$VIDEO")
+
+SOURCE_CODEC=$(printf '%s\n' "$SOURCE_INFO" |
+    sed -n 's/^codec_name=//p')
+SOURCE_PROFILE=$(printf '%s\n' "$SOURCE_INFO" |
+    sed -n 's/^profile=//p')
+SOURCE_PIX_FMT=$(printf '%s\n' "$SOURCE_INFO" |
+    sed -n 's/^pix_fmt=//p')
+SOURCE_LEVEL=$(printf '%s\n' "$SOURCE_INFO" |
+    sed -n 's/^level=//p')
+SOURCE_BITRATE=$(printf '%s\n' "$SOURCE_INFO" |
+    sed -n 's/^bit_rate=//p')
+SOURCE_AVG_FPS=$(printf '%s\n' "$SOURCE_INFO" |
+    sed -n 's/^avg_frame_rate=//p')
+SOURCE_R_FPS=$(printf '%s\n' "$SOURCE_INFO" |
+    sed -n 's/^r_frame_rate=//p')
+
+# Preferir el FPS promedio. Si no está disponible, usar el FPS nominal.
+SOURCE_FPS="$SOURCE_AVG_FPS"
+case "$SOURCE_FPS" in
+    ''|N/A|0/0)
+        SOURCE_FPS="$SOURCE_R_FPS"
+        ;;
+esac
+
+case "$SOURCE_FPS" in
+    ''|N/A|0/0)
+        echo "Error: ffprobe no pudo determinar el FPS del video." >&2
+        exit 1
+        ;;
+esac
+
+echo "Datos detectados por ffprobe:"
+echo "  Códec:          ${SOURCE_CODEC:-no informado}"
+echo "  Perfil:         ${SOURCE_PROFILE:-no informado}"
+echo "  Formato píxel:  ${SOURCE_PIX_FMT:-no informado}"
+echo "  Nivel:          ${SOURCE_LEVEL:-no informado}"
+echo "  Bitrate video:  ${SOURCE_BITRATE:-no informado}"
+echo "  FPS promedio:   ${SOURCE_AVG_FPS:-no informado}"
+echo "  FPS nominal:    ${SOURCE_R_FPS:-no informado}"
+echo "  FPS de salida:  $SOURCE_FPS"
+
+# Elegir un encoder FFmpeg según el códec detectado.
+case "$SOURCE_CODEC" in
+    h264)  VIDEO_ENCODER="libx264" ;;
+    hevc)  VIDEO_ENCODER="libx265" ;;
+    vp9)   VIDEO_ENCODER="libvpx-vp9" ;;
+    av1)   VIDEO_ENCODER="libaom-av1" ;;
+    mpeg4) VIDEO_ENCODER="mpeg4" ;;
+    *)
+        echo "Códec de entrada no contemplado: $SOURCE_CODEC" >&2
+        exit 1
+        ;;
+esac
+
+# Usar el bitrate de origen como objetivo si ffprobe informó uno válido.
+BITRATE_ARGS=""
+case "$SOURCE_BITRATE" in
+    ''|N/A|0) ;;
+    *) BITRATE_ARGS="-b:v $SOURCE_BITRATE" ;;
+esac
+
 ffmpeg -nostdin -hide_banner -loglevel warning -stats -y \
     -i "$VIDEO" \
     -loop 1 -i "$LOGO" \
     -filter_complex "$FILTER_COMPLEX" \
     -map "[outv]" \
     -map "0:a?" \
-    -c:v libx264 \
-    -preset medium \
-    -crf 0 \
-    -pix_fmt yuv420p \
-    -r "$FPS" \
+    -map_metadata 0 \
+    -c:v "$VIDEO_ENCODER" \
+    $BITRATE_ARGS \
+    -pix_fmt "$SOURCE_PIX_FMT" \
+    -r "$SOURCE_FPS" \
     -c:a aac \
+    -b:a 192k \
     -movflags +faststart \
     "$OUTPUT"
 

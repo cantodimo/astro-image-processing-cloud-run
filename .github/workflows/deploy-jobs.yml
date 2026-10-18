@@ -42,7 +42,7 @@ permissions:
   id-token: write
 
 jobs:
-  test-app-python:
+  test-code:
     runs-on: ubuntu-latest
 
     env:
@@ -105,7 +105,7 @@ jobs:
       - name: Run pytest
         run: |
             echo "Ejecutando pruebas de logo"
-            pytest -c tests/jobs/astro_video_processing/pytest.ini \
+            pytest -s -c tests/jobs/astro_video_processing/pytest.ini \
               tests/jobs/astro_video_processing/
 
       #TODO: hacer este prefijo dinamico segun el job editado
@@ -128,3 +128,121 @@ jobs:
             exit 1
 
           fi
+
+  docker_test:
+    needs: test-code
+    runs-on: ubuntu-latest
+    #if: github.event_name == 'workflow_dispatch' && inputs.solo_test == false
+
+    #para que quede pausado esperando aprobacion y poder primero ver si la prueba de codigo python quedo bien
+    environment: gcp-infrastructure 
+
+    env:
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_PROJECT_NUMBER: ${{ secrets.GCP_PROJECT_NUMBER }}
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      GCP_WIF_PROVIDER: ${{ secrets.GCP_WIF_PROVIDER }}
+      GCP_REGION: ${{ secrets.GCP_REGION }}
+      GCP_ARTIFACT_REGISTRY_REPO: ${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}
+      GCP_TERRAFORM_STATE_BUCKET: ${{ secrets.GCP_TERRAFORM_STATE_BUCKET }}
+      GCP_BUCKET_VOLUME: ${{ secrets.GCP_BUCKET_VOLUME }}
+      JOB_PAYLOAD: ${{ inputs.job_payload || '{"video":"VID_20260925_202317.mp4","scale":0.30,"opacity":0.40,"margin":0.02,"fps":30,"target_width":1080,"target_height":1920,"position":"right"}' }}
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # para intentar ocultar info de cualquier log de salida
+      - name: Mask GCP identifiers
+        run: |
+          echo "::add-mask::$GCP_PROJECT_ID"
+          echo "::add-mask::$GCP_PROJECT_NUMBER"
+          echo "::add-mask::$GCP_SERVICE_ACCOUNT"
+          echo "::add-mask::$GCP_WIF_PROVIDER"
+          echo "::add-mask::$GCP_REGION"
+          echo "::add-mask::$GCP_ARTIFACT_REGISTRY_REPO"
+          echo "::add-mask::$GCP_TERRAFORM_STATE_BUCKET"
+          echo "::add-mask::$GCP_BUCKET_VOLUME"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Setup Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Prepare test folders
+        run: |
+          mkdir -p imagenes_base
+          mkdir -p salida_procesos
+
+      - name: Download test video
+        run: |
+          VIDEO=$(echo "$JOB_PAYLOAD" | jq -r '.video')
+          LOCAL_VIDEO="${VIDEO//\//___}"
+
+          gcloud storage cp \
+            "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/$VIDEO" \
+            "$GITHUB_WORKSPACE/$LOCAL_VIDEO"
+
+      - name: Download logo
+        run: |
+          gcloud storage cp \
+            "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/imagenes_base/prueba_logotipo.png" \
+            "$GITHUB_WORKSPACE/imagenes_base/prueba_logotipo.png"
+
+      # crear el archivo de configuracion para el job con el formato esperado de
+      #{ tasks:[{payload1}, {payload2}]}
+      - name: Prepare Docker job config
+        run: |
+          VIDEO=$(echo "$JOB_PAYLOAD" | jq -r '.video')
+          LOCAL_VIDEO="${VIDEO//\//___}"
+          OUTPUT_NAME="$(basename "${VIDEO%.*}")_con_logo.mp4"
+
+          echo "$JOB_PAYLOAD" | jq \
+            --arg video "/mnt/bucket/$LOCAL_VIDEO" \
+            --arg logo "/mnt/bucket/imagenes_base/prueba_logotipo.png" \
+            --arg output "/mnt/bucket/salida_procesos/$OUTPUT_NAME" \
+            '{tasks: [(. + {video: $video, logo: $logo, output: $output})]}' \
+            > "$GITHUB_WORKSPACE/config_video.json"
+
+      - name: Build Docker image
+        working-directory: jobs/astro_video_processing
+        run: |
+          docker build \
+            -t astro-video-processing:test \
+            .
+
+      - name: Run Docker video processing test
+        run: |
+          docker run --rm \
+            --name astro-video-processing-test \
+            -e CLOUD_RUN_TASK_INDEX=0 \
+            -v "$GITHUB_WORKSPACE:/mnt/bucket" \
+            astro-video-processing:test \
+            /mnt/bucket/config_video.json
+
+
+      - name: Verify Docker output
+        working-directory: jobs/astro_video_processing
+        run: |
+          OUTPUT=$(jq -r '.tasks[0].output' "$GITHUB_WORKSPACE/config_video.json")
+          test -s "$GITHUB_WORKSPACE/${OUTPUT#/mnt/bucket/}"
+
+          echo "Prueba Docker exitosa"
+          echo "Archivo generado: $output"
+
+      - name: Push Docker image to Artifact Registry
+        working-directory: jobs/astro_video_processing
+        run: |
+          gcloud auth configure-docker "$GCP_REGION-docker.pkg.dev" --quiet
+
+          docker tag \
+            astro-video-processing:test \
+            "$GCP_REGION-docker.pkg.dev/$GCP_PROJECT_ID/$GCP_ARTIFACT_REGISTRY_REPO/astro-video-processing:${GITHUB_SHA}"
+
+          docker push \
+            "$GCP_REGION-docker.pkg.dev/$GCP_PROJECT_ID/$GCP_ARTIFACT_REGISTRY_REPO/astro-video-processing:${GITHUB_SHA}"
