@@ -1,0 +1,17 @@
+{
+  "tasks": [
+    {
+      "video": "/mnt/bucket/VID_20260925_202317.mp4",
+      "logo": "/mnt/bucket/imagenes_base/prueba_logotipo.png",
+      "output": "/mnt/bucket/salida_procesos/VID_20260925_202317_con_logo.mp4",
+      "scale": 0.3,
+      "opacity": 0.4,
+      "margin": 0.02,
+      "tolerance": 60,
+      "fps": 30,
+      "target_width": 1080,
+      "target_height": 1920,
+      "position": "right"
+    }
+  ]
+}

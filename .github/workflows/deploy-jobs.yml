@@ -131,7 +131,7 @@ jobs:
   docker_test:
     needs: test-code
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && inputs.solo_test == false
+    if: github.event_name == 'workflow_dispatch' || inputs.solo_test == false
 
     #para que quede pausado esperando aprobacion y poder primero ver si la prueba de codigo python quedo bien
     environment: gcp-infrastructure 
@@ -249,7 +249,7 @@ jobs:
   deploy_cloud_run_job:
     needs: docker_test
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && inputs.solo_test == false
+    if: github.event_name == 'workflow_dispatch' ||  inputs.solo_test == false
 
     env:
       GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
