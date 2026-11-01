@@ -7,10 +7,10 @@ on:
       - main
     paths:
       - "servicios/astro_image_processing/**"
-      - "tests/**"
-      - "pytest.ini"
+      - "tests/astro_image_processing/**"
+      #- "pytest.ini"
       - "terraform/deploy/**"
-      - ".github/workflows/deploy-service.yml"
+      #- ".github/workflows/deploy-service.yml"
 
   workflow_dispatch:
     inputs:
@@ -359,6 +359,7 @@ jobs:
       - name: Terraform Apply
         run: |
           terraform apply \
+            -target=google_cloud_run_v2_job.astro_image_processing \
             -auto-approve
         env:
           TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
