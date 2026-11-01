@@ -44,3 +44,44 @@ resource "google_cloud_run_v2_service" "astro_image_processing" {
     }
   }
 }
+
+resource "google_cloud_run_v2_job" "astro_video_processing" {
+  name     = "astro-video-processing-job"
+  location = var.region
+
+  template {
+    template {
+      timeout = "600s"
+      max_retries = 0
+
+      containers {
+        image = var.docker_image_job
+
+        resources {
+          limits = {
+            cpu    = "1"
+            memory = "512Mi"
+          }
+        }
+
+        volume_mounts {
+          name       = "gcs-volume"
+          mount_path = "/mnt/bucket"
+        }
+      }
+
+      volumes {
+        name = "gcs-volume"
+
+        gcs {
+          bucket    = var.gcs_bucket
+          read_only = false
+
+          mount_options = [
+            "only-dir=volume-cloud-run"
+          ]
+        }
+      }
+    }
+  }
+}

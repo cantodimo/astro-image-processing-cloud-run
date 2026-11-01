@@ -8,6 +8,12 @@ variable "region" {
 
 variable "docker_image" {
   type = string
+  default = ""
+}
+
+variable "docker_image_job" {
+  type = string
+  default = ""
 }
 
 variable "gcs_bucket" {
