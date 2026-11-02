@@ -254,6 +254,6 @@ if __name__ == "__main__":
         tolerance=args.tolerance,
         bg_color=None,
         position=args.position,
-        logo_path=args.logo,
+        logo_path=args.logo_path,
         output_prefix=args.output_prefix
     )
