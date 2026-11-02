@@ -23,6 +23,7 @@ on:
           - logo
           - texto
           - reescalar
+          - comparar_imgs
           - integracion
 
       solo_test:
@@ -30,6 +31,12 @@ on:
         required: true
         default: true
         type: boolean
+
+      integration_steps:
+        description: "Lista de tests a ejecutar en orden"
+        required: true
+        default: '["comparar_imagenes","reescalar", "logo", "texto"]'
+        type: string
 
       logo_payload:
         description: "JSON para /agregar_logo_a_imagen"
@@ -76,10 +83,18 @@ on:
           }
         type: string
 
-      integration_steps:
-        description: "Lista de tests a ejecutar en orden"
+      comparar_imgs_payload:
+        description: "JSON para /comparar_imagenes"
         required: true
-        default: '["reescalar", "logo", "texto"]'
+        default: |
+          {
+            "top_image_path": "camping.jpg",
+            "bottom_image_path": "IMG_20260820_013848.jpg",
+            "top_start_pct": 10,
+            "top_end_pct": 90,
+            "bottom_start_pct": 20,
+            "bottom_end_pct": 80
+          }
         type: string
 
 
@@ -109,7 +124,9 @@ jobs:
 
       REESCALAR_PAYLOAD: ${{ inputs.reescalar_payload  || '{"image_path":"camping.jpg","target_width":1080,"target_height":1920,"mode":"crop","crop_offset_pct":0}' }}
 
-      INTEGRATION_STEPS: ${{ inputs.integration_steps || '["reescalar", "logo", "texto"]' }}
+      COMPARAR_IMGS_PAYLOAD: ${{ inputs.comparar_imgs_payload  || '{"top_image_path":"camping.jpg","bottom_image_path":"IMG_20260820_013848.jpg","top_start_pct":10,"top_end_pct":90,"bottom_start_pct":20,"bottom_end_pct":80}' }}
+
+      INTEGRATION_STEPS: ${{ inputs.integration_steps || '["comparar_imagenes","reescalar", "logo", "texto"]' }}
 
     steps:
 
@@ -166,6 +183,10 @@ jobs:
           elif [ "$TEST_MODE" = "reescalar" ]; then
             echo "Ejecutando pruebas de reescalar"
             pytest -c "$PYTEST_CONFIG" "$TEST_PATH" -m reescalar -v
+
+          elif [ "$TEST_MODE" = "comparar_imgs" ]; then
+            echo "Ejecutando pruebas de comparar_imgs"
+            pytest -c "$PYTEST_CONFIG" "$TEST_PATH" -m comparar_imgs -v
 
           elif [ "$TEST_MODE" = "integracion" ]; then
             echo "Ejecutando prueba de integración"

@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify
 from py_processing.agregar_logo_a_imagen import apply_watermark
 from py_processing.poner_texto_imagen import add_text_to_image
 from py_processing.reescalar_imagen import crop_image
+from py_processing.comparar_imagenes import combine_images
 import os
 
 app = Flask(__name__)
@@ -125,6 +126,49 @@ def ruta_reescalar_imagen():
         )
 
     resultado = crop_image(**parametros)
+    return jsonify(resultado)
+
+
+@app.route("/comparar_imagenes", methods=["POST"])
+def ruta_comparar_imagenes():
+    parametros = request.get_json()
+
+    if "K_SERVICE" in os.environ:
+        # Cloud Run: las imágenes están bajo /mnt/bucket.
+        parametros["top_image_path"] = os.path.join(
+            "/mnt/bucket",
+            parametros["top_image_path"]
+        )
+        parametros["bottom_image_path"] = os.path.join(
+            "/mnt/bucket",
+            parametros["bottom_image_path"]
+        )
+        parametros["output_prefix"] = "/mnt/bucket/salida_procesos/"
+
+    elif "GITHUB_ACTIONS" in os.environ:
+        # GitHub Actions: las imágenes están bajo GITHUB_WORKSPACE.
+        workspace = os.environ["GITHUB_WORKSPACE"]
+
+        parametros["top_image_path"] = os.path.join(
+            workspace,
+            parametros["top_image_path"]
+        )
+        parametros["bottom_image_path"] = os.path.join(
+            workspace,
+            parametros["bottom_image_path"]
+        )
+        parametros["output_prefix"] = os.path.join(
+            workspace,
+            "salida_procesos"
+        )
+
+    else:
+        # PC local: conserva las rutas de entrada recibidas en el JSON.
+        parametros["output_prefix"] = (
+            r"C:/Users/Camilo/Desktop/cosas_astronomia/salida_procesos/"
+        )
+
+    resultado = combine_images(**parametros)
     return jsonify(resultado)
 
 if __name__ == "__main__":

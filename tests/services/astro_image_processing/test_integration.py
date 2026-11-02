@@ -12,6 +12,9 @@ from tests.services.astro_image_processing.test_texto import (
 from tests.services.astro_image_processing.test_reescalar import (
     test_reescalar_y_cortar as ejecutar_test_reescalar,
 )
+from tests.services.astro_image_processing.test_comparar_imagenes import (
+    test_comparar_imagenes as ejecutar_test_comparar_imagenes
+)
 
 
 OPERACIONES = {
@@ -29,6 +32,13 @@ OPERACIONES = {
         "payload_env": "REESCALAR_PAYLOAD",
         "image_field": "image_path",
         "ejecutar": ejecutar_test_reescalar,
+    },
+    #este test tocaria ejecutarlo de primeras para poder controlar bien cual imagen va arriba y abajo,
+    #pongo "image_field": "top_image_path" solo por compatibilidad por poderlo correr en cualquier orden
+    "comparar_imagenes": {
+        "payload_env": "COMPARAR_IMGS_PAYLOAD",
+        "image_field": "top_image_path",
+        "ejecutar": ejecutar_test_comparar_imagenes,
     },
 }
 
