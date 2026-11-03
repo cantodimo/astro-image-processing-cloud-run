@@ -19,20 +19,51 @@ on:
         default: true
         type: boolean
 
-      job_payload:
-        description: "parametros de la prueba"
+      tipo_prueba:
+        description: "Prueba que se quiere ejecutar"
         required: true
+        default: "unir"
+        type: choice
+        options:
+          - logo
+          - unir
+
+      logo_payload:
+        description: "Configuración JSON para la prueba de logo"
+        required: false
         default: |
-          { 
+          {
             "video": "VID_20260925_202317.mp4",
             "scale": 0.30,
             "opacity": 0.40,
             "margin": 0.02,
-            "tolerance": 60,
             "fps": 30,
             "target_width": 1080,
             "target_height": 1920,
             "position": "right"
+          }
+        type: string
+
+      unir_payload:
+        description: "Configuración JSON para la prueba de unión"
+        required: false
+        default: |
+          {
+            "elementos": [
+              {
+                "path": "camping.jpg",
+                "type": "image",
+                "duration": 3
+              },
+              {
+                "path": "VID_20260925_202317.mp4",
+                "type": "video",
+                "duration": 5
+              }
+            ],
+            "audio": "canciones/Jessica_Carter_Altman_-_Blood_Moon_(mp3.pm).mp3",
+            "inicio_audio": 10,
+            "fps": 24
           }
         type: string
 
@@ -54,7 +85,11 @@ jobs:
       GCP_TERRAFORM_STATE_BUCKET: ${{ secrets.GCP_TERRAFORM_STATE_BUCKET }}
       GCP_BUCKET_VOLUME: ${{ secrets.GCP_BUCKET_VOLUME }}
 
-      JOB_PAYLOAD: ${{ inputs.job_payload || '{"video":"VID_20260925_202317.mp4","scale":0.30,"opacity":0.40,"margin":0.02,"fps":30,"target_width":1080,"target_height":1920,"position":"right"}' }}
+      JOB_MODE: ${{ inputs.tipo_prueba || 'unir' }}
+
+      LOGO_PAYLOAD: ${{ inputs.logo_payload || '{"video":"VID_20260925_202317.mp4","scale":0.30,"opacity":0.40,"margin":0.02,"fps":30,"target_width":1080,"target_height":1920,"position":"right"}' }}
+
+      UNIR_PAYLOAD: ${{ inputs.unir_payload || '{"elementos":[{"path":"camping.jpg","type":"image","duration":3},{"path":"VID_20260925_202317.mp4","type":"video","duration":5}],"audio":"canciones/Jessica_Carter_Altman_-_Blood_Moon_(mp3.pm).mp3","inicio_audio":10,"fps":24}' }}
 
     steps:
 
@@ -101,11 +136,12 @@ jobs:
           mkdir -p salida_procesos
 
       #TODO: hacer que se ejecute tests de un job en especifico segun los jobs editados, crear un flujo por cada job editado en el commit
-      - name: Run pytest
+      - name: Run selected pytest
         run: |
-            echo "Ejecutando pruebas de logo"
-            pytest -s -c tests/jobs/astro_video_processing/pytest.ini \
-              tests/jobs/astro_video_processing/
+          echo "Ejecutando prueba: $JOB_MODE"
+          pytest -s -c tests/jobs/astro_video_processing/pytest.ini \
+            tests/jobs/astro_video_processing/ \
+            -m "$JOB_MODE"
 
       #TODO: hacer este prefijo dinamico segun el job editado
       - name: Upload outputs to GCS
@@ -145,7 +181,8 @@ jobs:
       GCP_ARTIFACT_REGISTRY_REPO: ${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}
       GCP_TERRAFORM_STATE_BUCKET: ${{ secrets.GCP_TERRAFORM_STATE_BUCKET }}
       GCP_BUCKET_VOLUME: ${{ secrets.GCP_BUCKET_VOLUME }}
-      JOB_PAYLOAD: ${{ inputs.job_payload || '{"video":"VID_20260925_202317.mp4","scale":0.30,"opacity":0.40,"margin":0.02,"fps":30,"target_width":1080,"target_height":1920,"position":"right"}' }}
+      
+      LOGO_PAYLOAD: ${{ inputs.logo_payload || '{"video":"VID_20260925_202317.mp4","scale":0.30,"opacity":0.40,"margin":0.02,"fps":30,"target_width":1080,"target_height":1920,"position":"right"}' }}
 
     steps:
 
@@ -180,7 +217,7 @@ jobs:
 
       - name: Download test video
         run: |
-          VIDEO=$(echo "$JOB_PAYLOAD" | jq -r '.video')
+          VIDEO=$(echo "$LOGO_PAYLOAD" | jq -r '.video')
           LOCAL_VIDEO="${VIDEO//\//___}"
 
           gcloud storage cp \
@@ -197,11 +234,11 @@ jobs:
       #{ tasks:[{payload1}, {payload2}]}
       - name: Prepare Docker job config
         run: |
-          VIDEO=$(echo "$JOB_PAYLOAD" | jq -r '.video')
+          VIDEO=$(echo "$LOGO_PAYLOAD" | jq -r '.video')
           LOCAL_VIDEO="${VIDEO//\//___}"
           OUTPUT_NAME="$(basename "${VIDEO%.*}")_con_logo.mp4"
 
-          echo "$JOB_PAYLOAD" | jq \
+          echo "$LOGO_PAYLOAD" | jq \
             --arg video "/mnt/bucket/$LOCAL_VIDEO" \
             --arg logo "/mnt/bucket/imagenes_base/prueba_logotipo.png" \
             --arg output "/mnt/bucket/salida_procesos/$OUTPUT_NAME" \
@@ -222,7 +259,8 @@ jobs:
             -e CLOUD_RUN_TASK_INDEX=0 \
             -v "$GITHUB_WORKSPACE:/mnt/bucket" \
             astro-video-processing:test \
-            /mnt/bucket/config_video.json
+              --modo agregar_logo \
+              --tasks-json /mnt/bucket/config_video.json
 
 
       - name: Verify Docker output
@@ -232,7 +270,7 @@ jobs:
           test -s "$GITHUB_WORKSPACE/${OUTPUT#/mnt/bucket/}"
 
           echo "Prueba Docker exitosa"
-          echo "Archivo generado: $output"
+          echo "Archivo generado: $OUTPUT"
 
       - name: Push Docker image to Artifact Registry
         working-directory: jobs/astro_video_processing

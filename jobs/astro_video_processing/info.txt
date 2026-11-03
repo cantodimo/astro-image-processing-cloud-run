@@ -1,0 +1,16 @@
+/mnt/bucket/config_example.json si se sube el archivo a la raiz del volumen
+
+gcloud run jobs execute astro-video-processing-job \
+  --region=us-central1 \
+  --project=astronomia-433001 \
+  --args=--modo,agregar_logo,--tasks-json,/mnt/bucket/config_example.json \
+  --tasks=1 \
+  --wait
+
+gcloud run jobs execute astro-video-processing-job \
+  --region=us-central1 \
+  --project=astronomia-433001 \
+  --args=--modo,unir_vid_img_aud,--tasks-json,/mnt/bucket/config_unir.json \
+  --tasks=1 \
+  --wait
+  

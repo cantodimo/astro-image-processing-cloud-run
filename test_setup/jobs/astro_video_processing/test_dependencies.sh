@@ -16,4 +16,6 @@ echo "Versiones instaladas:"
 ffmpeg -version | head -n 1
 pytest --version
 
+python -m pip install -r "$GITHUB_WORKSPACE/jobs/astro_video_processing/requirements.txt"
+
 echo "Dependencias instaladas correctamente."

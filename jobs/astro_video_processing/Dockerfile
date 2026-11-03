@@ -1,12 +1,16 @@
-FROM alpine:3.22
+FROM python:3.12-alpine
 
-RUN apk add --no-cache ffmpeg jq
+RUN apk add --no-cache ffmpeg
 
 WORKDIR /app
 
-COPY agregar_logo_a_video.sh /app/agregar_logo_a_video.sh
-COPY main.sh /app/main.sh
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-RUN chmod +x /app/agregar_logo_a_video.sh /app/main.sh
+COPY main.py .
+COPY agregar_logo_a_video.py .
+COPY unir_imagenes_videos_audios.py .
 
-ENTRYPOINT ["/app/main.sh"]
+ENV PYTHONUNBUFFERED=1
+
+ENTRYPOINT ["python", "/app/main.py"]

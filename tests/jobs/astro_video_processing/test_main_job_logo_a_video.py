@@ -1,114 +1,98 @@
+import importlib.util
 import json
 import os
-import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 from google.cloud import storage
 
 
-def preparar_entrada():
-    payload = json.loads(os.environ["JOB_PAYLOAD"])
+# Ubicar el directorio del job para que main.py encuentre sus módulos.
+JOB_DIR = (
+    Path(__file__).resolve().parents[3]
+    / "jobs"
+    / "astro_video_processing"
+)
+sys.path.insert(0, str(JOB_DIR))
 
-    workspace = os.environ["GITHUB_WORKSPACE"]
+# Importar main.py como módulo para ejecutar su función directamente.
+spec = importlib.util.spec_from_file_location(
+    "astro_video_processing_main",
+    JOB_DIR / "main.py",
+)
+main_job = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(main_job)
+
+
+def preparar_entrada():
+    payload = json.loads(os.environ["LOGO_PAYLOAD"])
+
+    workspace = Path(os.environ["GITHUB_WORKSPACE"])
     bucket_name = os.environ["GCP_BUCKET_VOLUME"]
 
-    storage_client = storage.Client()
-    bucket = storage_client.bucket(bucket_name)
+    bucket = storage.Client().bucket(bucket_name)
 
-    # Descargar el video.
-    video_name = payload["video"]
-    local_video = video_name.replace("/", "___")
-    video_path = os.path.join(workspace, local_video)
+    # Descargar el video y usar una ruta local para la tarea.
+    nombre_video = payload["video"]
+    ruta_video_local = workspace / nombre_video.replace("/", "___")
 
-    video_blob = bucket.blob(
-        f"volume-cloud-run/{video_name}"
-    )
-    video_blob.download_to_filename(video_path)
+    bucket.blob(
+        f"volume-cloud-run/{nombre_video}"
+    ).download_to_filename(str(ruta_video_local))
 
-    # Descargar el logo.
-    logo_path = os.path.join(
-        workspace,
-        "imagenes_base",
-        "prueba_logotipo.png",
-    )
+    # Descargar el logo que usa la prueba.
+    ruta_logo_local = workspace / "imagenes_base" / "prueba_logotipo.png"
+    ruta_logo_local.parent.mkdir(parents=True, exist_ok=True)
 
-    os.makedirs(os.path.dirname(logo_path), exist_ok=True)
-
-    logo_blob = bucket.blob(
+    bucket.blob(
         "volume-cloud-run/imagenes_base/prueba_logotipo.png"
-    )
-    logo_blob.download_to_filename(logo_path)
+    ).download_to_filename(str(ruta_logo_local))
 
-    # Preparar la salida.
-    output_dir = os.path.join(workspace, "salida_procesos")
-    os.makedirs(output_dir, exist_ok=True)
+    # Preparar la carpeta y el nombre del MP4 resultante.
+    carpeta_salida = workspace / "salida_procesos"
+    carpeta_salida.mkdir(parents=True, exist_ok=True)
 
-    filename_without_extension = os.path.splitext(
-        os.path.basename(video_name)
-    )[0]
+    nombre_sin_extension = Path(nombre_video).stem
+    ruta_salida = carpeta_salida / f"{nombre_sin_extension}_con_logo.mp4"
 
-    output_path = os.path.join(
-        output_dir,
-        f"{filename_without_extension}_con_logo.mp4",
-    )
-
-    # Crear el archivo de configuración para main.sh.
-    config = {
-        "tasks": [
-            {
-                **payload,
-                "video": video_path,
-                "logo": logo_path,
-                "output": output_path,
-            }
-        ]
+    # main.py espera un JSON que contiene una lista llamada tasks.
+    tarea = {
+        **payload,
+        "video": str(ruta_video_local),
+        "logo": str(ruta_logo_local),
+        "output": str(ruta_salida),
     }
 
-    config_path = os.path.join(workspace, "config_video.json")
+    configuracion = {"tasks": [tarea]}
+    ruta_configuracion = workspace / "config_video.json"
 
-    with open(config_path, "w", encoding="utf-8") as file:
-        json.dump(config, file, indent=2)
+    with ruta_configuracion.open("w", encoding="utf-8") as archivo:
+        json.dump(configuracion, archivo, indent=2)
 
-    return config_path, output_path
+    return ruta_configuracion, ruta_salida
 
 
-def ejecutar_main(config_path, output_path):
-    workspace = os.environ["GITHUB_WORKSPACE"]
+@pytest.mark.logo
+def test_main_job_logo(monkeypatch):
+    ruta_configuracion, ruta_salida = preparar_entrada()
 
-    script = os.path.join(
-        workspace,
-        "jobs",
-        "astro_video_processing",
-        "main.sh",
+    # Simular las variables y argumentos con que se ejecuta main.py.
+    monkeypatch.setenv("CLOUD_RUN_TASK_INDEX", "0")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "main.py",
+            "--modo",
+            "agregar_logo",
+            "--tasks-json",
+            str(ruta_configuracion),
+        ],
     )
 
-    env = os.environ.copy()
-    env["CLOUD_RUN_TASK_INDEX"] = "0"
+    # Ejecutar main.py en el proceso actual de pytest.
+    main_job.ejecutar()
 
-    result = subprocess.run(
-        ["sh", script, config_path],
-        capture_output=True,
-        text=True,
-        env=env,
-    )
-
-    print("---------- .sh log ---------------")
-    print(result.stdout, end="", flush=True)
-    print(result.stderr, end="", flush=True)
-
-    assert result.returncode == 0, (
-        f"Error al ejecutar main.sh.\n"
-        f"STDOUT:\n{result.stdout}\n"
-        f"STDERR:\n{result.stderr}"
-    )
-
-    assert os.path.isfile(output_path)
-    assert os.path.getsize(output_path) > 0
-
-    return output_path
-
-
-@pytest.mark.video
-def test_main_video():
-    config_path, output_path = preparar_entrada()
-    ejecutar_main(config_path, output_path)
+    assert ruta_salida.is_file()
+    assert ruta_salida.stat().st_size > 0
