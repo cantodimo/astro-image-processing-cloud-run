@@ -7,10 +7,10 @@ on:
       - main
     paths:
       - "servicios/astro_image_processing/**"
-      - "tests/astro_image_processing/**"
-      #- "pytest.ini"
+      - "tests/services/**"
+      - "pytest.ini"
       - "terraform/deploy/**"
-      #- ".github/workflows/deploy-service.yml"
+      - ".github/workflows/deploy-service.yml"
 
   workflow_dispatch:
     inputs:
@@ -22,6 +22,8 @@ on:
         options:
           - logo
           - texto
+          - reescalar
+          - comparar_imgs
           - integracion
 
       solo_test:
@@ -29,6 +31,12 @@ on:
         required: true
         default: true
         type: boolean
+
+      integration_steps:
+        description: "Lista de tests a ejecutar en orden"
+        required: true
+        default: '["comparar_imagenes","reescalar", "logo", "texto"]'
+        type: string
 
       logo_payload:
         description: "JSON para /agregar_logo_a_imagen"
@@ -41,7 +49,8 @@ on:
             "margin": 0.02,
             "tolerance": 60,
             "bg_color": null,
-            "position": "right"
+            "position": "right",
+            "logo_path":"imagenes_base/prueba_logotipo.png"
           }
         type: string
 
@@ -60,6 +69,34 @@ on:
             "font_path": "CrayonLibre-Regular.ttf"
           }
         type: string
+
+      reescalar_payload:
+        description: "JSON para /reescalar_imagen"
+        required: true
+        default: |
+          {
+            "image_path": "camping.jpg",
+            "target_width": 1080,
+            "target_height": 1920,
+            "mode": "crop",
+            "crop_offset_pct": 0
+          }
+        type: string
+
+      comparar_imgs_payload:
+        description: "JSON para /comparar_imagenes"
+        required: true
+        default: |
+          {
+            "top_image_path": "camping.jpg",
+            "bottom_image_path": "IMG_20260820_013848.jpg",
+            "top_start_pct": 10,
+            "top_end_pct": 90,
+            "bottom_start_pct": 20,
+            "bottom_end_pct": 80
+          }
+        type: string
+
 
 permissions:
   contents: read
@@ -81,9 +118,15 @@ jobs:
 
       TEST_MODE: ${{ inputs.endpoint || 'integracion' }}
 
-      LOGO_PAYLOAD: ${{ inputs.logo_payload || '{"base_path":"camping.jpg","scale":0.30,"opacity":0.80,"margin":0.02,"tolerance":60,"bg_color":null,"position":"right"}' }}
+      LOGO_PAYLOAD: ${{ inputs.logo_payload || '{"base_path":"camping.jpg","scale":0.30,"opacity":0.80,"margin":0.02,"tolerance":60,"bg_color":null,"position":"right","logo_path":"imagenes_base/prueba_logotipo.png"}' }}
 
       TEXT_PAYLOAD: ${{ inputs.texto_payload || '{"image_path":"camping.jpg","text":"Foto de la NASA","fontsize":0.03,"color":"skyblue","position":["center","top"],"margin":0.05,"max_width_pct":0.92,"font_path":"CrayonLibre-Regular.ttf"}' }}
+
+      REESCALAR_PAYLOAD: ${{ inputs.reescalar_payload  || '{"image_path":"camping.jpg","target_width":1080,"target_height":1920,"mode":"crop","crop_offset_pct":0}' }}
+
+      COMPARAR_IMGS_PAYLOAD: ${{ inputs.comparar_imgs_payload  || '{"top_image_path":"camping.jpg","bottom_image_path":"IMG_20260820_013848.jpg","top_start_pct":10,"top_end_pct":90,"bottom_start_pct":20,"bottom_end_pct":80}' }}
+
+      INTEGRATION_STEPS: ${{ inputs.integration_steps || '["comparar_imagenes","reescalar", "logo", "texto"]' }}
 
     steps:
 
@@ -122,33 +165,36 @@ jobs:
           mkdir -p salida_procesos
           rm -f salida_procesos/*
 
-      - name: Validate JSON payloads
-        run: |
-          echo "$LOGO_PAYLOAD" | jq empty
-          echo "$TEXT_PAYLOAD" | jq empty
-
-          echo "JSON de logo válido"
-          echo "JSON de texto válido"
-
       - name: Run pytest
         env:
-          PYTHONPATH: ${{ github.workspace }}/servicios/astro_image_processing
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/servicios/astro_image_processing
         run: |
-          if [ "$TEST_MODE" = "logo" ]; then
+          PYTEST_CONFIG="tests/services/pytest.ini"
+          TEST_PATH="tests/services/astro_image_processing"
 
+          if [ "$TEST_MODE" = "logo" ]; then
             echo "Ejecutando pruebas de logo"
-            pytest tests/ -m logo -v
+            pytest -c "$PYTEST_CONFIG" "$TEST_PATH" -m logo -v
 
           elif [ "$TEST_MODE" = "texto" ]; then
-
             echo "Ejecutando pruebas de texto"
-            pytest tests/ -m texto -v
+            pytest -c "$PYTEST_CONFIG" "$TEST_PATH" -m texto -v
+
+          elif [ "$TEST_MODE" = "reescalar" ]; then
+            echo "Ejecutando pruebas de reescalar"
+            pytest -c "$PYTEST_CONFIG" "$TEST_PATH" -m reescalar -v
+
+          elif [ "$TEST_MODE" = "comparar_imgs" ]; then
+            echo "Ejecutando pruebas de comparar_imgs"
+            pytest -c "$PYTEST_CONFIG" "$TEST_PATH" -m comparar_imgs -v
 
           elif [ "$TEST_MODE" = "integracion" ]; then
+            echo "Ejecutando prueba de integración"
+            pytest -c "$PYTEST_CONFIG" "$TEST_PATH" -m integration -v
 
-            echo "Ejecutando prueba de integración: logo -> texto"
-            pytest tests/ -m integration -v
-
+          else
+            echo "TEST_MODE desconocido: $TEST_MODE"
+            exit 1
           fi
 
       - name: Upload outputs to GCS

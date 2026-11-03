@@ -60,7 +60,7 @@ resource "google_cloud_run_v2_job" "astro_video_processing" {
         resources {
           limits = {
             cpu    = "1"
-            memory = "512Mi"
+            memory = "1Gi" #"512Mi" se murio en memoria el worker con un video de 160MB (3840x2160 22seg)
           }
         }
 
