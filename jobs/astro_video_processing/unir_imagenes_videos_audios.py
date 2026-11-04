@@ -111,25 +111,7 @@ def detectar_configuracion_video(elementos, fps_salida):
     return opciones
 
 
-def crear_video(elementos, audio, inicio_audio=0, salida=None, fps=24):
-    """
-    Une imágenes y videos, y agrega un tramo de audio.
-
-    elementos:
-        Lista de diccionarios con path, type y duration.
-
-    audio:
-        Ruta al archivo de audio.
-
-    inicio_audio:
-        Segundo desde donde se empieza a usar el audio.
-
-    salida:
-        Ruta del MP4 resultante. Si es None, se genera automáticamente.
-
-    fps:
-        Fotogramas por segundo de salida.
-    """
+def crear_video(elementos, audio=None, inicio_audio=0, salida=None, fps=24):
 
     # Cargar la lista por separado y pasar cada parámetro explícitamente.
     elementos = cargar_elementos(elementos)
@@ -194,42 +176,60 @@ def crear_video(elementos, audio, inicio_audio=0, salida=None, fps=24):
         clips_video.append(clip)
 
     # Concatenar los elementos respetando el orden de la lista.
-    video_final = ffmpeg.concat(
-        *clips_video,
-        v=1,
-        a=0,
-    ).node[0]
+    if len(clips_video) == 1:
+        # Con un solo elemento, ese clip ya es el video final.
+        video_final = clips_video[0]
+    else:
+        # Si hay varios, concatenarlos en el orden de la configuración.
+        video_final = ffmpeg.concat(
+            *clips_video,
+            v=1,
+            a=0,
+        ).node[0]
 
-    # Recortar el audio desde inicio_audio durante toda la secuencia.
-    # Si el audio no alcanza, se agrega silencio al final.
-    audio_entrada = ffmpeg.input(audio).audio
-
-    audio_final = (
-        audio_entrada
-        .filter(
-            "atrim",
-            start=inicio_audio,
-            duration=duracion_total,
-        )
-        .filter("asetpts", "PTS-STARTPTS")
-        .filter("apad")
-        .filter("atrim", duration=duracion_total)
-    )
 
     opciones_video = detectar_configuracion_video(elementos, fps)
 
+    # Preparar las opciones comunes de salida.
+    opciones_salida = {
+        "vcodec": opciones_video["vcodec"],
+        "pix_fmt": opciones_video["pix_fmt"],
+        "r": opciones_video["fps"],
+        "t": duracion_total,
+        "movflags": "+faststart",
+    }
+
+    # Solo agregar bitrate si fue detectado.
+    # Con una lista compuesta únicamente por imágenes no hay bitrate fuente.
+    if opciones_video.get("video_bitrate") is not None:
+        opciones_salida["video_bitrate"] = opciones_video["video_bitrate"]
+
+    streams_salida = [video_final]
+
+    # Agregar la pista de audio solo cuando se proporcionó una ruta.
+    if audio:
+        audio_entrada = ffmpeg.input(audio).audio
+
+        audio_final = (
+            audio_entrada
+            .filter(
+                "atrim",
+                start=inicio_audio,
+                duration=duracion_total,
+            )
+            .filter("asetpts", "PTS-STARTPTS")
+            .filter("apad")
+            .filter("atrim", duration=duracion_total)
+        )
+
+        streams_salida.append(audio_final)
+        opciones_salida["acodec"] = "aac"
+        opciones_salida["audio_bitrate"] = "192k"
+
     resultado = ffmpeg.output(
-        video_final,
-        audio_final,
+        *streams_salida,
         str(ruta_salida),
-        vcodec=opciones_video["vcodec"],
-        pix_fmt=opciones_video["pix_fmt"],
-        r=opciones_video["fps"],
-        video_bitrate=opciones_video.get("video_bitrate"),
-        acodec="aac",
-        audio_bitrate="192k",
-        t=duracion_total,
-        movflags="+faststart",
+        **opciones_salida,
     )
 
     resultado.overwrite_output().run()
@@ -250,7 +250,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--audio",
-        required=True,
+        default=None,
         help="Ruta al archivo de audio.",
     )
     parser.add_argument(
@@ -274,7 +274,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     crear_video(
-        elementos=arg.elementos,
+        elementos=args.elementos,
         audio=args.audio,
         inicio_audio=args.inicio_audio,
         salida=args.salida,

@@ -68,7 +68,7 @@ def ejecutar():
 
         crear_video(
             elementos=elementos,
-            audio=config["audio"],
+            audio=config.get("audio"),
             inicio_audio=config.get("inicio_audio", 0),
             salida=config.get("salida"),
             fps=config.get("fps", 24),
