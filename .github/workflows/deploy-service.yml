@@ -6,9 +6,9 @@ on:
       - dev
       - main
     paths:
-      - "servicios/astro_image_processing/**"
+      - "servicios/**"
       - "tests/services/**"
-      - "pytest.ini"
+      - "test_setup/services/**"
       - "terraform/deploy/**"
       - ".github/workflows/deploy-service.yml"
 
@@ -153,11 +153,18 @@ jobs:
       - name: Setup Google Cloud CLI
         uses: google-github-actions/setup-gcloud@v3
 
-      - name: Install Python dependencies
-        working-directory: servicios/astro_image_processing
+      - name: Install test dependencies
+        working-directory: test_setup/services/astro_image_processing
+        shell: bash
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          SCRIPT="./test_dependencies.sh"
+
+          if [ -f "$SCRIPT" ]; then
+            bash "$SCRIPT"
+          else
+            echo "No se encontró: $PWD/$SCRIPT"
+            exit 1
+          fi
 
       - name: Prepare test folders
         run: |
