@@ -1,0 +1,40 @@
+{
+    "workflow": "deploy-jobs.yml",
+    "branch": "dev",
+    "inputs": {
+        "solo_test": "true",
+        "tipo_prueba": "poner_texto",
+        "logo_payload": {
+            "video": "VID_20260925_202317.mp4",
+            "textos": [
+                {
+                    "text": "Prueba de texto abajo centrado",
+                    "font_path": "CrayonLibre-Regular.ttf",
+                    "fontsize": 0.05,
+                    "color": "white",
+                    "position": ["center", "bottom"],
+                    "margin": 0.02,
+                    "max_width_pct": 0.9
+                },
+                {
+                    "text": "Prueba de texto centro izquierda",
+                    "font_path": "CrayonLibre-Regular.ttf",
+                    "fontsize": 0.1,
+                    "color": "white",
+                    "position": ["left", "center"],
+                    "margin": 0.05,
+                    "max_width_pct": 0.6
+                },
+                {
+                    "text": "Prueba de texto arriba derecha",
+                    "font_path": "CrayonLibre-Regular.ttf",
+                    "fontsize": 0.02,
+                    "color": "white",
+                    "position": ["right", "top"],
+                    "margin": 0.001,
+                    "max_width_pct": 0.9
+                }
+            ]
+        }
+    }
+}

@@ -14,25 +14,28 @@ from agregar_logo_a_video import ENCODERS
 # La carpeta fonts está al lado de este script.
 FONT_DIR = Path(__file__).resolve().parent / "fonts"
 
-def render_text_image(text, font_path, fontsize_px, color, bg_color, max_width_px,
-                      line_spacing=1.1, padding=12):
+def render_text_image(
+    text,
+    font_path,
+    fontsize_px,
+    color,
+    bg_color,
+    max_width_px,
+    line_spacing=1.1,
+    padding=12,
+):
     """
-    Renderiza el texto en una imagen RGBA con Pillow.
-    - text: texto (puede contener '\n')
-    - font_path: ruta a .ttf (o None para fuente por defecto)
-    - fontsize_px: tamaño en píxeles (int)
-    - color: color del texto (ej. "white" o "#FFFF00")
-    - bg_color: None => transparente, o color string/tuple
-    - max_width_px: ancho máximo en píxeles para realizar wrap de líneas
-    - line_spacing: factor multiplicador entre líneas
-    - padding: padding interno en px
+    Dibuja el texto en una imagen RGBA.
+
+    Conserva las cajas medidas con textbbox para compensar el desplazamiento
+    propio de algunas fuentes y evitar que se recorten sus letras.
     """
-    # Crear fuente
+    # Cargar la fuente solicitada. Si no está disponible, intentar una
+    # fuente del sistema y finalmente usar la fuente predeterminada de Pillow.
     try:
         if font_path and os.path.isfile(font_path):
             font = ImageFont.truetype(font_path, fontsize_px)
         else:
-            # intentar Arial u otra, si falla usar load_default
             try:
                 font = ImageFont.truetype("arial.ttf", fontsize_px)
             except Exception:
@@ -40,85 +43,97 @@ def render_text_image(text, font_path, fontsize_px, color, bg_color, max_width_p
     except Exception:
         font = ImageFont.load_default()
 
-    # Helper para medir texto
-    dummy_img = Image.new("RGBA", (10, 10))
-    draw = ImageDraw.Draw(dummy_img)
+    imagen_medicion = Image.new("RGBA", (10, 10))
+    draw_medicion = ImageDraw.Draw(imagen_medicion)
 
-    # Wrap manual por ancho en píxeles
-    lines = []
-    for paragraph in text.split("\n"):
-        words = paragraph.split()
-        if not words:
-            lines.append("")  # línea vacía
+    # Separar por párrafos para respetar los saltos de línea explícitos
+    # y ajustar las líneas al ancho disponible.
+    lineas = []
+
+    for parrafo in text.split("\n"):
+        palabras = parrafo.split()
+
+        if not palabras:
+            lineas.append("")
             continue
-        line = words[0]
-        for w in words[1:]:
-            test = line + " " + w
-            #w_px = draw.textsize(test, font=font)[0]
-            bbox = draw.textbbox((0, 0), test, font=font)
-            w_px = bbox[2] - bbox[0]
-            if w_px <= max_width_px:
-                line = test
+
+        linea_actual = palabras[0]
+
+        for palabra in palabras[1:]:
+            candidata = f"{linea_actual} {palabra}"
+            caja = draw_medicion.textbbox((0, 0), candidata, font=font)
+            ancho_candidata = caja[2] - caja[0]
+
+            if ancho_candidata <= max_width_px:
+                linea_actual = candidata
             else:
-                lines.append(line)
-                line = w
-        lines.append(line)
+                lineas.append(linea_actual)
+                linea_actual = palabra
 
-    # Calcular ancho máximo real y altura total
-    max_line_w = 0
-    line_heights = []
-    for ln in lines:
-        bbox = draw.textbbox((0, 0), ln, font=font)
-        w_px = bbox[2] - bbox[0]
-        h_px = bbox[3] - bbox[1]
+        lineas.append(linea_actual)
 
-        line_heights.append(h_px)
-        if w_px > max_line_w:
-            max_line_w = w_px
+    # Guardar las cajas completas. Los valores left/top pueden ser negativos
+    # y luego se compensan al dibujar.
+    cajas_texto = []
+    anchos_lineas = []
+    altos_lineas = []
 
-    if max_line_w < 1:
-        max_line_w = max_width_px
+    for linea in lineas:
+        caja = draw_medicion.textbbox((0, 0), linea, font=font)
+        cajas_texto.append(caja)
+        anchos_lineas.append(caja[2] - caja[0])
+        altos_lineas.append(caja[3] - caja[1])
 
-    total_h = int(sum(line_heights) * line_spacing)
+    ancho_texto = max(anchos_lineas, default=0)
 
-    img_w = max_line_w + padding * 2
-    img_h = total_h + padding * 2
+    if ancho_texto < 1:
+        ancho_texto = max_width_px
 
-    mode = "RGBA"
+    alto_texto = int(sum(altos_lineas) * line_spacing)
+
+    ancho_imagen = ancho_texto + padding * 2
+    alto_imagen = alto_texto + padding * 2
+
+    # Fondo transparente cuando bg_color es None.
     if bg_color is None:
-        bg = (0, 0, 0, 0)
+        color_fondo = (0, 0, 0, 0)
     else:
-        # convertir color a RGBA si es string simple
         try:
-            # crear temporal para obtener RGBA desde Pillow
-            tmp = Image.new("RGBA", (1, 1), bg_color)
-            bg = tmp.getpixel((0, 0))
+            imagen_color = Image.new("RGBA", (1, 1), bg_color)
+            color_fondo = imagen_color.getpixel((0, 0))
         except Exception:
-            bg = (0, 0, 0, 255)
+            color_fondo = (0, 0, 0, 255)
 
-    img = Image.new(mode, (img_w, img_h), bg)
-    draw = ImageDraw.Draw(img)
+    imagen_texto = Image.new(
+        "RGBA",
+        (ancho_imagen, alto_imagen),
+        color_fondo,
+    )
+    draw = ImageDraw.Draw(imagen_texto)
 
-    # Dibujar líneas
+    # Ubicar cada línea dentro del PNG compensando el left/top de su caja.
     y = padding
-    for i, ln in enumerate(lines):
-        draw.text((padding, y), ln, font=font, fill=color)
-        y += int(line_heights[i] * line_spacing)
 
-    return img
+    for indice, linea in enumerate(lineas):
+        caja = cajas_texto[indice]
+        left, top, _, _ = caja
 
-def agregar_texto(config):
+        draw.text(
+            (padding - left, y - top),
+            linea,
+            font=font,
+            fill=color,
+        )
+
+        y += int(altos_lineas[indice] * line_spacing)
+
+    return imagen_texto
+
+def _leer_datos_video(video_path):
     """
-    Agrega las capas de texto de config["textos"] y conserva, en lo posible,
-    la configuración de video de la entrada: codec, FPS, pixel format y bitrate.
+    Lee dimensiones de presentación, duración, codec, FPS, pixel format,
+    bitrate y presencia de audio del video.
     """
-    video_path = str(config["video"])
-    out_path = Path(config["output"])
-    textos = config["textos"]
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Consultar tanto el stream de video como la duración y el audio.
     metadata = ffmpeg.probe(video_path)
 
     video_metadata = next(
@@ -127,170 +142,245 @@ def agregar_texto(config):
         if stream["codec_type"] == "video"
     )
 
-    video_w = int(video_metadata["width"])
-    video_h = int(video_metadata["height"])
-    video_duration = float(metadata["format"]["duration"])
+    ancho = int(video_metadata["width"])
+    alto = int(video_metadata["height"])
 
-    # Usar el mismo encoder correspondiente al codec de origen,
-    # siguiendo el mapeo que ya usa agregar_logo.
-    codec_fuente = video_metadata.get("codec_name")
-    encoder = ENCODERS.get(codec_fuente, "libx264")
+    # FFmpeg suele guardar videos verticales como cuadros horizontales
+    # acompañados por metadatos de rotación. Ajustar las dimensiones usadas
+    # para calcular las coordenadas del texto.
+    rotacion = video_metadata.get("tags", {}).get("rotate", 0)
 
-    formato_pixel = video_metadata.get("pix_fmt") or "yuv420p"
-    bitrate = video_metadata.get("bit_rate")
+    for dato in video_metadata.get("side_data_list", []):
+        if "rotation" in dato:
+            rotacion = dato["rotation"]
+            break
 
-    # Preferir el FPS promedio y recurrir al nominal si no está disponible.
-    fps_salida = video_metadata.get("avg_frame_rate")
+    rotacion = round(float(rotacion)) % 360
 
-    if not fps_salida or fps_salida in {"N/A", "0/0"}:
-        fps_salida = video_metadata.get("r_frame_rate")
+    if rotacion in {90, 270}:
+        ancho, alto = alto, ancho
 
-    # Normalizar la fracción, por ejemplo, "30/1".
-    if fps_salida and fps_salida not in {"N/A", "0/0"}:
-        fps_salida = str(Fraction(fps_salida))
+    fps = video_metadata.get("avg_frame_rate")
+
+    if not fps or fps in {"N/A", "0/0"}:
+        fps = video_metadata.get("r_frame_rate")
+
+    if fps and fps not in {"N/A", "0/0"}:
+        fps = str(Fraction(fps))
     else:
-        fps_salida = None
+        fps = None
+
+    bitrate = video_metadata.get("bit_rate")
 
     tiene_audio = any(
         stream.get("codec_type") == "audio"
         for stream in metadata["streams"]
     )
 
-    entrada_video = ffmpeg.input(video_path)
-    video_con_textos = entrada_video.video
+    return {
+        "metadata": metadata,
+        "width": ancho,
+        "height": alto,
+        "duration": float(metadata["format"]["duration"]),
+        "codec": video_metadata.get("codec_name"),
+        "pixel_format": video_metadata.get("pix_fmt") or "yuv420p",
+        "bitrate": bitrate,
+        "fps": fps,
+        "has_audio": tiene_audio,
+    }
 
-    # Mantener las imágenes temporales disponibles hasta que termine FFmpeg.
-    with tempfile.TemporaryDirectory() as temp_dir:
-        for indice, opciones_texto in enumerate(textos):
-            texto = opciones_texto["text"]
+def _crear_capas_texto(video_stream, textos, datos_video, temp_dir):
+    """
+    Renderiza cada texto y lo superpone al stream de video.
+    """
+    video_w = datos_video["width"]
+    video_h = datos_video["height"]
+    fps = datos_video["fps"] or 24
 
-            # Los nombres de fuentes relativos se buscan junto al script,
-            # dentro de la carpeta fonts.
-            font_path = opciones_texto.get(
-                "font_path",
-                "CrayonLibre-Regular.ttf",
-            )
-            ruta_fuente = Path(font_path)
+    video_con_textos = video_stream
 
-            if not ruta_fuente.is_absolute():
-                ruta_fuente = FONT_DIR / ruta_fuente
+    for indice, opciones_texto in enumerate(textos):
+        font_path = opciones_texto.get(
+            "font_path",
+            "CrayonLibre-Regular.ttf",
+        )
+        ruta_fuente = Path(font_path)
 
-            fontsize = float(opciones_texto.get("fontsize", 0.05))
+        if not ruta_fuente.is_absolute():
+            ruta_fuente = FONT_DIR / ruta_fuente
 
-            # Un tamaño <= 1 se interpreta como proporción de la altura.
-            if fontsize <= 1:
-                fontsize_px = max(8, int(video_h * fontsize))
-            else:
-                fontsize_px = int(fontsize)
+        fontsize = float(opciones_texto.get("fontsize", 0.05))
 
-            max_width_pct = float(
-                opciones_texto.get("max_width_pct", 0.90)
-            )
-            max_text_w = int(video_w * max_width_pct) - 4
-
-            # Pillow dibuja cada texto una sola vez como PNG RGBA.
-            imagen_texto = render_text_image(
-                text=texto,
-                font_path=str(ruta_fuente),
-                fontsize_px=fontsize_px,
-                color=opciones_texto.get("color", "white"),
-                bg_color=opciones_texto.get("bg_color"),
-                max_width_px=max_text_w,
-                line_spacing=float(opciones_texto.get("line_spacing", 1.12)),
-                padding=int(opciones_texto.get("padding", 12)),
-            )
-
-            txt_w, txt_h = imagen_texto.size
-            margin = float(opciones_texto.get("margin", 0.02))
-            margin_px = int(video_h * margin)
-
-            position = opciones_texto.get(
-                "position",
-                ["center", "bottom"],
-            )
-
-            # JSON representa position como lista.
-            if isinstance(position, list):
-                position = tuple(position)
-
-            if isinstance(position, tuple) and len(position) == 2:
-                horizontal, vertical = position
-
-                if horizontal == "left":
-                    x = margin_px
-                elif horizontal == "right":
-                    x = video_w - txt_w - margin_px
-                else:
-                    x = (video_w - txt_w) // 2
-
-                if vertical == "top":
-                    y = margin_px
-                elif vertical == "center":
-                    y = (video_h - txt_h) // 2
-                else:
-                    y = video_h - txt_h - margin_px
-            else:
-                # También permite coordenadas numéricas [x, y].
-                x = int(position[0])
-                y = int(position[1])
-
-            ruta_png = Path(temp_dir) / f"texto_{indice}.png"
-            imagen_texto.save(ruta_png, format="PNG")
-
-            # FFmpeg repite la imagen y la superpone al video.
-            entrada_texto = ffmpeg.input(
-                str(ruta_png),
-                loop=1,
-                framerate=fps_salida or 24,
-            )
-
-            video_con_textos = ffmpeg.overlay(
-                video_con_textos,
-                entrada_texto.video,
-                x=x,
-                y=y,
-                shortest=1,
-                format="auto",
-            )
-
-        # Empezar con las opciones de codificación que reflejan el origen.
-        opciones_salida = {
-            "vcodec": encoder,
-            "pix_fmt": formato_pixel,
-            "movflags": "+faststart",
-            "map_metadata": 0,
-        }
-
-        # Mantener el FPS original cuando FFprobe lo reportó.
-        if fps_salida:
-            opciones_salida["r"] = fps_salida
-
-        # Igual que agregar_logo: conservar el bitrate de video cuando existe.
-        if bitrate and bitrate not in {"N/A", "0"}:
-            opciones_salida["video_bitrate"] = int(bitrate)
+        # Un valor <= 1 expresa el tamaño como proporción de la altura.
+        if fontsize <= 1:
+            fontsize_px = max(8, int(video_h * fontsize))
         else:
-            # FFprobe no siempre entrega el bitrate del stream.
-            # CRF 18 prioriza calidad alta si no hay bitrate de origen disponible.
-            opciones_salida["crf"] = int(config.get("crf", 18))
+            fontsize_px = int(fontsize)
 
-        # Mantener el comportamiento de audio que usa agregar_logo.
+        max_width_pct = float(
+            opciones_texto.get("max_width_pct", 0.90)
+        )
+        ancho_maximo_texto = int(video_w * max_width_pct) - 4
+
+        imagen_texto = render_text_image(
+            text=opciones_texto["text"],
+            font_path=str(ruta_fuente),
+            fontsize_px=fontsize_px,
+            color=opciones_texto.get("color", "white"),
+            bg_color=opciones_texto.get("bg_color"),
+            max_width_px=ancho_maximo_texto,
+            line_spacing=float(opciones_texto.get("line_spacing", 1.12)),
+            padding=int(opciones_texto.get("padding", 12)),
+        )
+
+        texto_w, texto_h = imagen_texto.size
+        position = opciones_texto.get(
+            "position",
+            ["center", "bottom"],
+        )
+        margin = float(opciones_texto.get("margin", 0.02))
+
+        x, y = _calcular_posicion_texto(
+            position=position,
+            video_w=video_w,
+            video_h=video_h,
+            texto_w=texto_w,
+            texto_h=texto_h,
+            margin=margin,
+        )
+
+        ruta_png = Path(temp_dir) / f"texto_{indice}.png"
+        imagen_texto.save(ruta_png, format="PNG")
+
+        entrada_texto = ffmpeg.input(
+            str(ruta_png),
+            loop=1,
+            framerate=fps,
+        )
+
+        video_con_textos = ffmpeg.overlay(
+            video_con_textos,
+            entrada_texto.video,
+            x=x,
+            y=y,
+            shortest=1,
+            format="auto",
+        )
+
+    return video_con_textos
+
+def _crear_opciones_salida(config, datos_video):
+    """
+    Prepara opciones de codificación tomando como referencia el video fuente.
+    """
+    codec_fuente = datos_video["codec"]
+    encoder = ENCODERS.get(codec_fuente, "libx264")
+
+    opciones = {
+        "vcodec": encoder,
+        "pix_fmt": datos_video["pixel_format"],
+        "t": datos_video["duration"],
+        "movflags": "+faststart",
+        "map_metadata": 0,
+    }
+
+    if datos_video["fps"]:
+        opciones["r"] = datos_video["fps"]
+
+    bitrate = datos_video["bitrate"]
+
+    if bitrate and bitrate not in {"N/A", "0"}:
+        opciones["video_bitrate"] = int(bitrate)
+    else:
+        # Usar calidad alta si FFprobe no entrega bitrate del stream.
+        opciones["crf"] = int(config.get("crf", 18))
+
+    if datos_video["has_audio"]:
+        opciones["acodec"] = "aac"
+        opciones["audio_bitrate"] = "192k"
+
+    return opciones
+
+
+
+def _calcular_posicion_texto(
+    position,
+    video_w,
+    video_h,
+    texto_w,
+    texto_h,
+    margin,
+):
+    """Calcula la esquina superior izquierda de la capa de texto."""
+    margen_x = int(video_w * margin)
+    margen_y = int(video_h * margin)
+
+    # Una lista de JSON como ["center", "bottom"] se convierte en tupla.
+    if isinstance(position, list):
+        position = tuple(position)
+
+    if isinstance(position, tuple) and len(position) == 2:
+        horizontal, vertical = position
+
+        if horizontal == "left":
+            x = margen_x
+        elif horizontal == "right":
+            x = video_w - texto_w - margen_x
+        else:
+            x = (video_w - texto_w) // 2
+
+        if vertical == "top":
+            y = margen_y
+        elif vertical == "center":
+            y = (video_h - texto_h) // 2
+        else:
+            y = video_h - texto_h - margen_y
+
+        return x, y
+
+    # También permite posiciones numéricas [x, y].
+    return int(position[0]), int(position[1])
+
+
+def agregar_texto(config):
+    """
+    Agrega las capas indicadas en config["textos"] al video config["video"].
+    """
+    video_path = str(config["video"])
+    ruta_salida = Path(config["output"])
+    ruta_salida.parent.mkdir(parents=True, exist_ok=True)
+
+    # Leer una vez los metadatos para usar las dimensiones y la codificación
+    # del video original.
+    datos_video = _leer_datos_video(video_path)
+
+    entrada_video = ffmpeg.input(video_path)
+
+    # Los PNG temporales deben seguir existiendo hasta que FFmpeg termine.
+    with tempfile.TemporaryDirectory() as temp_dir:
+        video_con_textos = _crear_capas_texto(
+            video_stream=entrada_video.video,
+            textos=config["textos"],
+            datos_video=datos_video,
+            temp_dir=temp_dir,
+        )
+
+        opciones_salida = _crear_opciones_salida(config, datos_video)
         streams_salida = [video_con_textos]
 
-        if tiene_audio:
+        if datos_video["has_audio"]:
             streams_salida.append(entrada_video.audio)
-            opciones_salida["acodec"] = "aac"
-            opciones_salida["audio_bitrate"] = "192k"
 
         resultado = ffmpeg.output(
             *streams_salida,
-            str(out_path),
+            str(ruta_salida),
             **opciones_salida,
         )
 
         resultado.overwrite_output().run()
 
-    print(f"Video generado: {out_path}")
-    return str(out_path)
+    print(f"Video generado: {ruta_salida}")
+    return str(ruta_salida)
 
 def leer_argumentos():
     parser = argparse.ArgumentParser(

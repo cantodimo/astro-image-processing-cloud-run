@@ -95,7 +95,7 @@ permissions:
 
 jobs:
   test-code:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 #ubuntu-latest
 
     env:
       GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -190,7 +190,7 @@ jobs:
 
   docker_test:
     needs: test-code
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 #ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && inputs.solo_test == false
 
     #para que quede pausado esperando aprobacion y poder primero ver si la prueba de codigo python quedo bien
@@ -310,7 +310,7 @@ jobs:
 
   deploy_cloud_run_job:
     needs: docker_test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 #ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && inputs.solo_test == false
 
     env:
