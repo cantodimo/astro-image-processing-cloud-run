@@ -1,0 +1,20 @@
+{
+  "workflow": "deploy-jobs.yml",
+  "branch": "dev",
+  "inputs": {
+    "solo_test": "true",
+    "tipo_prueba": "unir",
+    "unir_payload": {
+      "elementos": [
+        {
+          "path": "camping.jpg",
+          "type": "image",
+          "duration": 3
+        }
+      ],
+      "audio": "canciones/Jessica_Carter_Altman_-_Blood_Moon_(mp3.pm).mp3",
+      "inicio_audio": 10,
+      "fps": 24
+    }
+  }
+}
