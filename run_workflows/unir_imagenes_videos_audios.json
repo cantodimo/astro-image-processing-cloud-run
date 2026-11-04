@@ -10,6 +10,12 @@
           "path": "camping.jpg",
           "type": "image",
           "duration": 3
+        },
+        {
+          "path": "VID_20260925_202317.mp4",
+          "type": "video",
+          "seg_inicio_video":10,
+          "duration": 5
         }
       ],
       "audio": "canciones/Jessica_Carter_Altman_-_Blood_Moon_(mp3.pm).mp3",

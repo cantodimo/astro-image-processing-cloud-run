@@ -110,14 +110,13 @@ def detectar_configuracion_video(elementos, fps_salida):
 
     return opciones
 
-
 def crear_video(elementos, audio=None, inicio_audio=0, salida=None, fps=24):
-
-    # Cargar la lista por separado y pasar cada parámetro explícitamente.
+    # Acepta elementos como lista, ruta a JSON o cadena JSON.
     elementos = cargar_elementos(elementos)
 
     ancho, alto = elegir_lienzo(elementos)
 
+    # La duración total sigue siendo la suma de duration de cada elemento.
     duracion_total = sum(
         float(elemento["duration"])
         for elemento in elementos
@@ -140,19 +139,38 @@ def crear_video(elementos, audio=None, inicio_audio=0, salida=None, fps=24):
         duracion = float(elemento["duration"])
 
         if elemento["type"] == "image":
-            # Mantener la imagen como fuente de fotogramas durante su duración.
+            # La imagen conserva el comportamiento anterior:
+            # se repite desde el inicio durante duration segundos.
             entrada = ffmpeg.input(
                 elemento["path"],
                 loop=1,
                 framerate=fps,
             )
+
+            clip = entrada.video.filter(
+                "trim",
+                duration=duracion,
+            )
+
         else:
             entrada = ffmpeg.input(elemento["path"])
 
-        # Escalar cada elemento sin deformarlo, centrarlo y rellenar con negro.
+            # Si no se especifica seg_inicio_video, el segmento empieza en 0.
+            inicio_video = float(
+                elemento.get("seg_inicio_video", 0)
+            )
+
+            # duration indica cuánto dura el segmento desde inicio_video.
+            clip = entrada.video.filter(
+                "trim",
+                start=inicio_video,
+                duration=duracion,
+            )
+
+        # Reiniciar los tiempos del segmento y aplicar los filtros
+        # que se usan tanto para imágenes como para videos.
         clip = (
-            entrada.video
-            .filter("trim", duration=duracion)
+            clip
             .filter("setpts", "PTS-STARTPTS")
             .filter("fps", fps=fps)
             .filter(
@@ -175,22 +193,20 @@ def crear_video(elementos, audio=None, inicio_audio=0, salida=None, fps=24):
 
         clips_video.append(clip)
 
-    # Concatenar los elementos respetando el orden de la lista.
+    # Si hay un solo elemento, usarlo directamente.
+    # Si hay varios, concatenarlos conservando el orden de la lista.
     if len(clips_video) == 1:
-        # Con un solo elemento, ese clip ya es el video final.
         video_final = clips_video[0]
     else:
-        # Si hay varios, concatenarlos en el orden de la configuración.
         video_final = ffmpeg.concat(
             *clips_video,
             v=1,
             a=0,
         ).node[0]
 
-
     opciones_video = detectar_configuracion_video(elementos, fps)
 
-    # Preparar las opciones comunes de salida.
+    # Opciones comunes para el archivo final.
     opciones_salida = {
         "vcodec": opciones_video["vcodec"],
         "pix_fmt": opciones_video["pix_fmt"],
@@ -199,14 +215,14 @@ def crear_video(elementos, audio=None, inicio_audio=0, salida=None, fps=24):
         "movflags": "+faststart",
     }
 
-    # Solo agregar bitrate si fue detectado.
-    # Con una lista compuesta únicamente por imágenes no hay bitrate fuente.
+    # Solo pasar bitrate cuando FFprobe encontró uno.
+    # Esto evita enviar "-b:v None" cuando solo hay imágenes.
     if opciones_video.get("video_bitrate") is not None:
         opciones_salida["video_bitrate"] = opciones_video["video_bitrate"]
 
     streams_salida = [video_final]
 
-    # Agregar la pista de audio solo cuando se proporcionó una ruta.
+    # El audio sigue siendo opcional.
     if audio:
         audio_entrada = ffmpeg.input(audio).audio
 
@@ -223,6 +239,7 @@ def crear_video(elementos, audio=None, inicio_audio=0, salida=None, fps=24):
         )
 
         streams_salida.append(audio_final)
+
         opciones_salida["acodec"] = "aac"
         opciones_salida["audio_bitrate"] = "192k"
 
@@ -235,7 +252,6 @@ def crear_video(elementos, audio=None, inicio_audio=0, salida=None, fps=24):
     resultado.overwrite_output().run()
 
     print(f"Video creado: {ruta_salida}")
-
 
 if __name__ == "__main__":
     # argparse obtiene los valores para la ejecución independiente.
