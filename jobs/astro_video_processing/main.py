@@ -5,6 +5,7 @@ from pathlib import Path
 
 from agregar_logo_a_video import agregar_logo
 from unir_imagenes_videos_audios import cargar_elementos, crear_video
+from poner_texto_a_video import agregar_texto
 
 
 def leer_argumentos():
@@ -15,7 +16,7 @@ def leer_argumentos():
     parser.add_argument(
         "--modo",
         required=True,
-        choices=["agregar_logo", "unir_vid_img_aud"],
+        choices=["agregar_logo", "unir_vid_img_aud", "poner_texto"],
         help="Tipo de proceso que se ejecutará.",
     )
 
@@ -73,6 +74,9 @@ def ejecutar():
             salida=config.get("salida"),
             fps=config.get("fps", 24),
         )
+
+    elif args.modo == "poner_texto":
+        agregar_texto(config)
 
 
 if __name__ == "__main__":

@@ -6,9 +6,10 @@ on:
       - dev
       - main
     paths:
-      - "jobs/astro_video_processing/**"
-      - "tests/jobs/astro_video_processing/**"
-      - "test_setup/jobs/astro_video_processing/**"
+      - "jobs/**"
+      - "tests/jobs/**"
+      - "test_setup/jobs/**"
+      - "terraform/deploy/**"
       - ".github/workflows/deploy-jobs.yml"
 
   workflow_dispatch:
@@ -27,6 +28,7 @@ on:
         options:
           - logo
           - unir
+          - poner_texto
 
       logo_payload:
         description: "Configuración JSON para la prueba de logo"
@@ -67,6 +69,26 @@ on:
           }
         type: string
 
+      texto_payload:
+        description: "Configuración JSON para la prueba de texto"
+        required: false
+        default: |
+          {
+            "video": "VID_20260925_202317.mp4",
+            "textos": [
+              {
+                "text": "Prueba de texto",
+                "font_path": "CrayonLibre-Regular.ttf",
+                "fontsize": 0.05,
+                "color": "white",
+                "position": ["center", "bottom"],
+                "margin": 0.02,
+                "max_width_pct": 0.9
+              }
+            ]
+          }
+        type: string
+
 permissions:
   contents: read
   id-token: write
@@ -90,6 +112,8 @@ jobs:
       LOGO_PAYLOAD: ${{ inputs.logo_payload || '{"video":"VID_20260925_202317.mp4","scale":0.30,"opacity":0.40,"margin":0.02,"fps":30,"target_width":1080,"target_height":1920,"position":"right"}' }}
 
       UNIR_PAYLOAD: ${{ inputs.unir_payload || '{"elementos":[{"path":"camping.jpg","type":"image","duration":3},{"path":"VID_20260925_202317.mp4","type":"video","duration":5}],"audio":"canciones/Jessica_Carter_Altman_-_Blood_Moon_(mp3.pm).mp3","inicio_audio":10,"fps":24}' }}
+
+      TEXTO_PAYLOAD: ${{ inputs.texto_payload || '{"video":"VID_20260925_202317.mp4","textos":[{"text":"Prueba de texto","font_path":"CrayonLibre-Regular.ttf","fontsize":0.05,"color":"white","position":["center","bottom"],"margin":0.02,"max_width_pct":0.9}]}' }}
 
     steps:
 

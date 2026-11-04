@@ -1,1 +1,2 @@
 ffmpeg-python
+Pillow==11.3.0
