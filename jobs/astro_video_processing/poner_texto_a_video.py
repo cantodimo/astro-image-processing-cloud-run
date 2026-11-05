@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 from fractions import Fraction
 
 from agregar_logo_a_video import ENCODERS
+from helpers.reescalar import ajustar_video_a_lienzo
 
 # La carpeta fonts está al lado de este script.
 FONT_DIR = Path(__file__).resolve().parent / "fonts"
@@ -358,10 +359,40 @@ def agregar_texto(config):
 
     # Los PNG temporales deben seguir existiendo hasta que FFmpeg termine.
     with tempfile.TemporaryDirectory() as temp_dir:
+        # Si no se pasan dimensiones, conservar las dimensiones de presentación
+        # del video fuente.
+        ancho_salida = int(
+            config.get("target_width", datos_video["width"])
+        )
+        alto_salida = int(
+            config.get("target_height", datos_video["height"])
+        )
+
+        # "pad" conserva el cuadro completo y añade bordes si hacen falta.
+        # "crop" llena el lienzo y recorta el sobrante.
+        modo_ajuste = config.get("fit_mode", "pad")
+
+        video_ajustado = ajustar_video_a_lienzo(
+            video=entrada_video.video,
+            target_width=ancho_salida,
+            target_height=alto_salida,
+            mode=modo_ajuste,
+            crop_offset_pct=float(config.get("crop_offset_pct", 0)),
+            pad_color=config.get("pad_color", "black"),
+        )
+
+        # El tamaño de texto, sus márgenes y sus posiciones deben calcularse
+        # con las dimensiones del cuadro que se generará.
+        datos_video_salida = {
+            **datos_video,
+            "width": ancho_salida,
+            "height": alto_salida,
+        }
+
         video_con_textos = _crear_capas_texto(
-            video_stream=entrada_video.video,
+            video_stream=video_ajustado,
             textos=config["textos"],
-            datos_video=datos_video,
+            datos_video=datos_video_salida,
             temp_dir=temp_dir,
         )
 

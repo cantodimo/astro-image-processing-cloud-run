@@ -6,7 +6,7 @@
         "tipo_prueba": "comparar_videos",
         "comparar_videos_payload": {
             "top_video_path": "VID_20260925_202317.mp4",
-            "bottom_video_path": "VID_20260925_202317.mp4",
+            "bottom_video_path": "VID_20260819_224309.mp4",
             "top_start_pct": 30,
             "top_end_pct": 70,
             "bottom_start_pct": 0,

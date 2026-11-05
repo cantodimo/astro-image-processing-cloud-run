@@ -76,6 +76,11 @@ on:
         default: |
           {
             "video": "VID_20260925_202317.mp4",
+            "target_width": 1080,
+            "target_height": 1920,
+            "fit_mode": "pad",
+            "crop_offset_pct": 0,
+            "pad_color": "black",
             "textos": [
               {
                 "text": "Prueba de texto",
@@ -96,7 +101,7 @@ on:
         default: |
           {
             "top_video_path": "VID_20260925_202317.mp4",
-            "bottom_video_path": "VID_20260925_202317.mp4",
+            "bottom_video_path": "VID_20260819_224309.mp4",
             "top_start_pct": 30,
             "top_end_pct": 70,
             "bottom_start_pct": 0,
