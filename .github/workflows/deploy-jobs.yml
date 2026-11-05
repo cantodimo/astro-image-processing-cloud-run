@@ -29,6 +29,7 @@ on:
           - logo
           - unir
           - poner_texto
+          - comparar_videos
 
       logo_payload:
         description: "Configuración JSON para la prueba de logo"
@@ -89,6 +90,22 @@ on:
           }
         type: string
 
+      comparar_videos_payload:
+        description: "Configuración JSON para la prueba de comparación de videos"
+        required: false
+        default: |
+          {
+            "top_video_path": "VID_20260925_202317.mp4",
+            "bottom_video_path": "VID_20260925_202317.mp4",
+            "top_start_pct": 30,
+            "top_end_pct": 70,
+            "bottom_start_pct": 0,
+            "bottom_end_pct": 100,
+            "audio_mode": "none",
+            "fps": 24
+          }
+        type: string
+
 permissions:
   contents: read
   id-token: write
@@ -114,6 +131,8 @@ jobs:
       UNIR_PAYLOAD: ${{ inputs.unir_payload || '{"elementos":[{"path":"camping.jpg","type":"image","duration":3},{"path":"VID_20260925_202317.mp4","type":"video","duration":5}],"audio":"canciones/Jessica_Carter_Altman_-_Blood_Moon_(mp3.pm).mp3","inicio_audio":10,"fps":24}' }}
 
       TEXTO_PAYLOAD: ${{ inputs.texto_payload || '{"video":"VID_20260925_202317.mp4","textos":[{"text":"Prueba de texto","font_path":"CrayonLibre-Regular.ttf","fontsize":0.05,"color":"white","position":["center","bottom"],"margin":0.02,"max_width_pct":0.9}]}' }}
+
+      COMPARAR_VIDEOS_PAYLOAD: ${{ inputs.comparar_videos_payload || '{"top_video_path":"VID_20260925_202317.mp4","bottom_video_path":"VID_20260819_224309.mp4","top_start_pct":30,"top_end_pct":70,"bottom_start_pct":0,"bottom_end_pct":100,"audio_mode":"none","fps":24}' }}
 
     steps:
 

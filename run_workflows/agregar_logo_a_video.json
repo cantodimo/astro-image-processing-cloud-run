@@ -8,6 +8,7 @@
             "video": "VID_20260925_202317.mp4",
             "scale": 0.30,
             "opacity": 0.40,
+            "position": "right",
             "margin": 0.02,
             "fps": 30,
             "target_width": 1080,

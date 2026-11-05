@@ -6,7 +6,7 @@ from pathlib import Path
 from agregar_logo_a_video import agregar_logo
 from unir_imagenes_videos_audios import cargar_elementos, crear_video
 from poner_texto_a_video import agregar_texto
-
+from comparar_videos import comparar_videos
 
 def leer_argumentos():
     parser = argparse.ArgumentParser(
@@ -16,7 +16,7 @@ def leer_argumentos():
     parser.add_argument(
         "--modo",
         required=True,
-        choices=["agregar_logo", "unir_vid_img_aud", "poner_texto"],
+        choices=["agregar_logo", "unir_vid_img_aud", "poner_texto", "comparar_videos"],
         help="Tipo de proceso que se ejecutará.",
     )
 
@@ -77,6 +77,9 @@ def ejecutar():
 
     elif args.modo == "poner_texto":
         agregar_texto(config)
+
+    elif args.modo == "comparar_videos":
+        comparar_videos(config)
 
 
 if __name__ == "__main__":
