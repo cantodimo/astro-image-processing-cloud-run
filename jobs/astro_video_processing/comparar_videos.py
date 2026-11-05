@@ -4,6 +4,7 @@ from pathlib import Path
 
 import ffmpeg
 
+from helpers.reescalar import ajustar_video_a_lienzo
 
 def leer_datos_video(video_path):
     """Obtiene dimensiones visibles y duración de un video."""
@@ -188,6 +189,24 @@ def comparar_videos(config):
         "vstack",
         inputs=2,
     )
+
+    tiene_ancho = "target_width" in config
+    tiene_alto = "target_height" in config
+
+    if tiene_ancho != tiene_alto:
+        raise ValueError(
+            "Debes especificar juntos target_width y target_height."
+        )
+
+    if tiene_ancho:
+        video_combinado = ajustar_video_a_lienzo(
+            video=video_combinado,
+            target_width=config["target_width"],
+            target_height=config["target_height"],
+            mode=config.get("fit_mode", "pad"),
+            crop_offset_pct=float(config.get("crop_offset_pct", 0)),
+            pad_color=config.get("pad_color", "black"),
+        )
 
     audio_mode = config.get("audio_mode", "none")
 

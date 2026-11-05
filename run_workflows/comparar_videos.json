@@ -12,7 +12,9 @@
             "bottom_start_pct": 0,
             "bottom_end_pct": 100,
             "audio_mode": "none",
-            "fps": 24
+            "fps": 24,
+            "target_width": 1080,
+            "target_height": 1920
           }
     }
 }

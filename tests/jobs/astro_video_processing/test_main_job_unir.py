@@ -93,7 +93,7 @@ def preparar_entrada():
     carpeta_salida = workspace / "salida_procesos"
     carpeta_salida.mkdir(parents=True, exist_ok=True)
 
-    ruta_salida = carpeta_salida / "video_unido_test.mp4"
+    ruta_salida = carpeta_salida / payload.get( "output", "video_unido_test.mp4")
 
     # La tarea conserva los demás parámetros del payload, por ejemplo
     # inicio_audio y fps, y reemplaza las rutas remotas por rutas locales.

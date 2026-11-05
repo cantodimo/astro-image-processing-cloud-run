@@ -73,6 +73,11 @@ def ejecutar():
             inicio_audio=config.get("inicio_audio", 0),
             salida=config.get("salida"),
             fps=config.get("fps", 24),
+            target_width=config.get("target_width"),
+            target_height=config.get("target_height"),
+            fit_mode=config.get("fit_mode", "pad"),
+            crop_offset_pct=float(config.get("crop_offset_pct", 0)),
+            pad_color=config.get("pad_color", "black"),
         )
 
     elif args.modo == "poner_texto":

@@ -55,6 +55,7 @@ def preparar_entrada():
 
     nombre_sin_extension = Path(nombre_video).stem
     ruta_salida = carpeta_salida / f"{nombre_sin_extension}_con_logo.mp4"
+    ruta_salida = carpeta_salida / payload.get( "output", f"{nombre_sin_extension}_con_logo.mp4")
 
     # main.py espera un JSON que contiene una lista llamada tasks.
     tarea = {

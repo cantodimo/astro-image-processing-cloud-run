@@ -5,6 +5,8 @@ from pathlib import Path
 
 import ffmpeg
 
+from helpers.reescalar import ajustar_video_a_lienzo
+
 
 def cargar_elementos(elementos_config):
     """
@@ -110,7 +112,18 @@ def detectar_configuracion_video(elementos, fps_salida):
 
     return opciones
 
-def crear_video(elementos, audio=None, inicio_audio=0, salida=None, fps=24):
+def crear_video(
+    elementos,
+    audio=None,
+    inicio_audio=0,
+    salida=None,
+    fps=24,
+    target_width=None,
+    target_height=None,
+    fit_mode="pad",
+    crop_offset_pct=0,
+    pad_color="black",
+):
     # Acepta elementos como lista, ruta a JSON o cadena JSON.
     elementos = cargar_elementos(elementos)
 
@@ -204,6 +217,24 @@ def crear_video(elementos, audio=None, inicio_audio=0, salida=None, fps=24):
             a=0,
         ).node[0]
 
+    tiene_ancho_objetivo = target_width is not None
+    tiene_alto_objetivo = target_height is not None
+
+    if tiene_ancho_objetivo != tiene_alto_objetivo:
+        raise ValueError(
+            "Debes especificar juntos target_width y target_height."
+        )
+
+    if tiene_ancho_objetivo:
+        video_final = ajustar_video_a_lienzo(
+            video=video_final,
+            target_width=target_width,
+            target_height=target_height,
+            mode=fit_mode,
+            crop_offset_pct=crop_offset_pct,
+            pad_color=pad_color,
+        )
+
     opciones_video = detectar_configuracion_video(elementos, fps)
 
     # Opciones comunes para el archivo final.
@@ -287,6 +318,23 @@ if __name__ == "__main__":
         help="FPS de salida. Predeterminado: 24.",
     )
 
+    parser.add_argument("--target-width", type=int, default=None)
+    parser.add_argument("--target-height", type=int, default=None)
+    parser.add_argument(
+        "--fit-mode",
+        choices=["crop", "pad"],
+        default="pad",
+    )
+    parser.add_argument(
+        "--crop-offset-pct",
+        type=float,
+        default=0,
+    )
+    parser.add_argument(
+        "--pad-color",
+        default="black",
+    )
+
     args = parser.parse_args()
 
     crear_video(
@@ -295,4 +343,9 @@ if __name__ == "__main__":
         inicio_audio=args.inicio_audio,
         salida=args.salida,
         fps=args.fps,
+        target_width=args.target_width,
+        target_height=args.target_height,
+        fit_mode=args.fit_mode,
+        crop_offset_pct=args.crop_offset_pct,
+        pad_color=args.pad_color
     )

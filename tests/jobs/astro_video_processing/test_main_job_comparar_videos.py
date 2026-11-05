@@ -62,7 +62,7 @@ def preparar_entrada():
     carpeta_salida = workspace / "salida_procesos"
     carpeta_salida.mkdir(parents=True, exist_ok=True)
 
-    ruta_salida = carpeta_salida / "comparacion_videos_test.mp4"
+    ruta_salida = carpeta_salida / payload.get( "output", "comparacion_videos_test.mp4")
 
     # Reemplazar las rutas del bucket por rutas locales para el test.
     tarea = {

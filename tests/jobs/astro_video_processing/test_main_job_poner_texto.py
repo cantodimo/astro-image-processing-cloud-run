@@ -49,7 +49,7 @@ def preparar_entrada():
     carpeta_salida = workspace / "salida_procesos"
     carpeta_salida.mkdir(parents=True, exist_ok=True)
 
-    ruta_salida = carpeta_salida / "video_con_texto_test.mp4"
+    ruta_salida = carpeta_salida / payload.get( "output", "video_con_texto_test.mp4")
 
     # La tarea debe contener los mismos parámetros que recibe agregar_texto().
     tarea = {
