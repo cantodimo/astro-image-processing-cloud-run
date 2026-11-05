@@ -2,6 +2,7 @@ from fractions import Fraction
 
 import ffmpeg
 
+from helpers.reescalar import ajustar_video_a_lienzo
 
 ENCODERS = {
     "h264": "libx264",
@@ -73,12 +74,17 @@ def agregar_logo(config):
     entrada_video = ffmpeg.input(video)
     entrada_logo = ffmpeg.input(logo, loop=1)
 
-    # Ajustar el video al tamaño configurado. Esto conserva el comportamiento
-    # del shell: el video se escala directamente a esas dimensiones.
-    video_filtrado = (
-        entrada_video.video
-        .filter("scale", ancho_salida, alto_salida)
-        .filter("setsar", 1)
+    # "pad" conserva el video completo y rellena con negro.
+    # "crop" llena el tamaño objetivo y recorta el sobrante.
+    modo_ajuste = config.get("fit_mode", "pad")
+
+    video_filtrado = ajustar_video_a_lienzo(
+        video=entrada_video.video,
+        target_width=ancho_salida,
+        target_height=alto_salida,
+        mode=modo_ajuste,
+        crop_offset_pct=float(config.get("crop_offset_pct", 0)),
+        pad_color=config.get("pad_color", "black"),
     )
 
     # Escalar el logo conservando su proporción y habilitar alfa.

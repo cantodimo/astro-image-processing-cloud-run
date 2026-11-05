@@ -12,7 +12,8 @@
             "fps": 30,
             "target_width": 1080,
             "target_height": 1920,
-            "position": "right"
+            "fit_mode": "pad",
+            "crop_offset_pct": 0
         }
     }
 }
