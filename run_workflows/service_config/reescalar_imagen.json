@@ -1,0 +1,15 @@
+{
+    "workflow": "deploy-service.yml",
+    "branch": "dev",
+    "inputs": {
+        "solo_test": "true",
+        "endpoint": "reescalar",
+        "reescalar_payload": {
+            "image_path": "camping.jpg",
+            "target_width": 1920,
+            "target_height": 1080,
+            "mode": "pad",
+            "crop_offset_pct": 0
+        }
+    }
+}

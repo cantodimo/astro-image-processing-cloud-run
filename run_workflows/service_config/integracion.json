@@ -1,0 +1,44 @@
+{
+    "workflow": "deploy-service.yml",
+    "branch": "dev",
+    "inputs": {
+        "solo_test": "true",
+        "endpoint": "integracion",
+        "integration_steps": "[\"comparar_imagenes\",\"reescalar\", \"logo\", \"texto\"]",
+        "comparar_imgs_payload": {
+            "top_image_path": "IMG_20260820_013848.jpg",
+            "bottom_image_path": "camping.jpg",
+            "top_start_pct": 30,
+            "top_end_pct": 70,
+            "bottom_start_pct": 20,
+            "bottom_end_pct": 80
+        },
+        "reescalar_payload": {
+            "image_path": "no deberia importar",
+            "target_width": 1000,
+            "target_height": 1200,
+            "mode": "pad",
+            "crop_offset_pct": 50
+        },
+        "logo_payload": {
+            "base_path": "xx",
+            "scale": 0.50,
+            "opacity": 0.80,
+            "margin": 0.02,
+            "tolerance": 60,
+            "bg_color": null,
+            "position": "left",
+            "logo_path":"imagenes_base/prueba_logotipo.png"
+        },
+        "texto_payload": {
+            "image_path": "yyy",
+            "text": "Prueba integracion Texto en imagen",
+            "fontsize": 0.06,
+            "color": "skyblue",
+            "position": ["right", "bottom"],
+            "margin": 0.05,
+            "max_width_pct": 0.92,
+            "font_path": "CrayonLibre-Regular.ttf"
+        }
+    }
+}

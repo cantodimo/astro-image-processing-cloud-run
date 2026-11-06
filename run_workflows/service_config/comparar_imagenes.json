@@ -1,0 +1,16 @@
+{
+    "workflow": "deploy-service.yml",
+    "branch": "dev",
+    "inputs": {
+        "solo_test": "true",
+        "endpoint": "comparar_imgs",
+        "comparar_imgs_payload": {
+            "top_image_path": "camping.jpg",
+            "bottom_image_path": "IMG_20260820_013848.jpg",
+            "top_start_pct": 10,
+            "top_end_pct": 90,
+            "bottom_start_pct": 20,
+            "bottom_end_pct": 80
+          }
+    }
+}

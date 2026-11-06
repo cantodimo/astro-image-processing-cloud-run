@@ -1,8 +1,8 @@
 # gh auth login
-# python test_workflow_github_actions.py comparar_videos.json
-# python test_workflow_github_actions.py poner_texto_a_video.json
-# python test_workflow_github_actions.py unir_imagenes_videos_audios.json
-# python test_workflow_github_actions.py agregar_logo_a_video.json
+# python test_workflow_github_actions.py jobs_config/comparar_videos.json
+# python test_workflow_github_actions.py jobs_config/poner_texto_a_video.json
+# python test_workflow_github_actions.py jobs_config/unir_imagenes_videos_audios.json
+# python test_workflow_github_actions.py jobs_config/agregar_logo_a_video.json
 
 import json
 import subprocess

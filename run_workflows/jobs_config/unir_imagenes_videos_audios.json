@@ -21,8 +21,8 @@
       "audio": "canciones/Jessica_Carter_Altman_-_Blood_Moon_(mp3.pm).mp3",
       "inicio_audio": 10,
       "fps": 24,
-      "target_width": 1080,
-      "target_height": 1920,
+      "target_width": 1000,
+      "target_height": 800,
       "fit_mode": "pad",
       "crop_offset_pct": 0,
       "pad_color": "black"

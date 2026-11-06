@@ -7,8 +7,8 @@
         "texto_payload": {
             "video": "VID_20260925_202317.mp4",
             "output": "prueba_vide_texto_reescalar.mp4",
-            "target_width": 780,
-            "target_height": 1020,
+            "target_width": 2500,
+            "target_height": 2300,
             "fit_mode": "pad",
             "crop_offset_pct": 0,
             "pad_color": "black",

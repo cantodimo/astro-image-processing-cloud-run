@@ -1,0 +1,18 @@
+{
+    "workflow": "deploy-service.yml",
+    "branch": "dev",
+    "inputs": {
+        "solo_test": "true",
+        "endpoint": "texto",
+        "texto_payload": {
+            "image_path": "camping.jpg",
+            "text": "Prueba de Texto en imagen.",
+            "fontsize": 0.03,
+            "color": "skyblue",
+            "position": ["center", "top"],
+            "margin": 0.05,
+            "max_width_pct": 0.92,
+            "font_path": "CrayonLibre-Regular.ttf"
+        }
+    }
+}

@@ -11,8 +11,8 @@
             "position": "right",
             "margin": 0.02,
             "fps": 30,
-            "target_width": 1080,
-            "target_height": 1920,
+            "target_width": 500,
+            "target_height": 200,
             "fit_mode": "pad",
             "crop_offset_pct": 0
         }

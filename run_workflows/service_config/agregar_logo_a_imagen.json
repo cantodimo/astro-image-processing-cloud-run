@@ -1,0 +1,18 @@
+{
+    "workflow": "deploy-service.yml",
+    "branch": "dev",
+    "inputs": {
+        "solo_test": "true",
+        "endpoint": "logo",
+        "logo_payload": {
+            "base_path": "camping.jpg",
+            "scale": 0.30,
+            "opacity": 0.80,
+            "margin": 0.02,
+            "tolerance": 60,
+            "bg_color": null,
+            "position": "right",
+            "logo_path":"imagenes_base/prueba_logotipo.png"
+        }
+    }
+}
