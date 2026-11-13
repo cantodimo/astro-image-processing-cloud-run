@@ -14,6 +14,51 @@ def resolver_ruta(raiz, ruta):
 
     return os.path.join(raiz, ruta)
 
+def configurar_entrada_y_salida(parametros, campo_imagen):
+    """
+    Convierte la ruta relativa recibida en una ruta local de entrada y
+    mantiene su carpeta relativa debajo de salida_procesos.
+    """
+    ruta_relativa = parametros[campo_imagen]
+
+    if "K_SERVICE" in os.environ:
+        # Cloud Run tiene el bucket montado en /mnt/bucket.
+        raiz = "/mnt/bucket"
+    elif "GITHUB_ACTIONS" in os.environ:
+        # GitHub Actions usa el checkout como raíz de los archivos.
+        raiz = os.environ["GITHUB_WORKSPACE"]
+    else:
+        # En local se conserva la raíz de fotos usada actualmente.
+        raiz = r"C:/Users/Camilo/Desktop/cosas_astronomia/fotos"
+
+    ruta_entrada = parametros[campo_imagen]
+
+    # La API recibe rutas relativas a la raíz del volumen.
+    ruta_normalizada = os.path.normpath(ruta_entrada).replace("\\", "/")
+    partes_ruta = ruta_normalizada.split("/")
+
+    # Si otra operación generó esta imagen, su ruta empieza por
+    # "salida_procesos/". Quitamos ese prefijo solo para calcular
+    # la carpeta de salida; la ruta de entrada debe conservarse.
+    if partes_ruta[0] == "salida_procesos":
+        partes_carpeta = partes_ruta[1:-1]
+    else:
+        partes_carpeta = partes_ruta[:-1]
+
+    carpeta_relativa = os.path.join(*partes_carpeta) if partes_carpeta else ""
+
+    parametros["output_prefix"] = os.path.join(
+        raiz,
+        "salida_procesos",
+        carpeta_relativa
+    )
+
+    # La ruta completa de entrada conserva "salida_procesos/" si ya era
+    # una imagen intermedia de la integración.
+    parametros[campo_imagen] = os.path.join(raiz, ruta_entrada)
+
+    return raiz
+
 ## comentario para probar disparo workflow solo con modificar este archivo
 @app.route("/agregar_logo_a_imagen", methods=["POST"])
 def agregar_logo():
@@ -24,46 +69,13 @@ def agregar_logo():
 
     parametros = request.get_json()
 
-    if "K_SERVICE" in os.environ:
-        # Cloud Run: el bucket está montado en /mnt/bucket
-        raiz = "/mnt/bucket"
+    raiz = configurar_entrada_y_salida(parametros, "base_path")
 
-    elif "GITHUB_ACTIONS" in os.environ:
-        # GitHub Actions: los archivos están bajo GITHUB_WORKSPACE
-        raiz = os.environ["GITHUB_WORKSPACE"]
-
-    else:
-        # PC local
-        raiz = None
-
-    if raiz is not None:
-        parametros["base_path"] = resolver_ruta(
-            raiz,
-            parametros["base_path"]
-        )
-
-        logo_path = parametros.get(
-            "logo_path",
-            "imagenes_base/prueba_logotipo.png"
-        )
-        parametros["logo_path"] = resolver_ruta(
-            raiz,
-            logo_path
-        )
-
-        parametros["output_prefix"] = os.path.join(
-            raiz,
-            "salida_procesos"
-        )
-
-    else:
-        # PC
-        parametros["logo_path"] = (
-            r"C:/Users/Camilo/Desktop/cosas_astronomia/imagenes_base/prueba_logotipo.png"
-        )
-        parametros["output_prefix"] = (
-            r"C:/Users/Camilo/Desktop/cosas_astronomia/salida_procesos/"
-        )        
+    logo_path = parametros.get(
+        "logo_path",
+        "imagenes_base/prueba_logotipo.png"
+    )
+    parametros["logo_path"] = resolver_ruta(raiz, logo_path)       
 
     resultado = apply_watermark(**parametros)
     return jsonify(resultado)
@@ -78,28 +90,12 @@ def ruta_poner_texto_a_imagen():
   http://localhost:8080/poner_texto_a_imagen
     """
     parametros = request.get_json()
+    
+    _= configurar_entrada_y_salida(parametros, "image_path")
+
     if isinstance(parametros.get("position"), list):
         parametros["position"] = tuple(parametros["position"])
-
-    if "K_SERVICE" in os.environ:
-        # Cloud Run
-        parametros["output_prefix"] = "/mnt/bucket/salida_procesos/"
-        parametros["image_path"] = "/mnt/bucket/" + parametros["image_path"]
-
-    elif "GITHUB_ACTIONS" in os.environ:
-        workspace = os.environ["GITHUB_WORKSPACE"]
-        parametros["output_prefix"] = os.path.join(
-            workspace, "salida_procesos"
-        )
-        parametros["image_path"] = os.path.join(
-            workspace, parametros["image_path"]
-        )
-
-    else:
-        # PC
-        parametros["output_prefix"] = r"C:/Users/Camilo/Desktop/cosas_astronomia/salida_procesos/"
         
-
     resultado = add_text_to_image(**parametros)
     return jsonify(resultado)
 
@@ -107,23 +103,7 @@ def ruta_poner_texto_a_imagen():
 def ruta_reescalar_imagen():
     parametros = request.get_json()
 
-    if "K_SERVICE" in os.environ:
-        parametros["output_prefix"] = "/mnt/bucket/salida_procesos/"
-        parametros["image_path"] = "/mnt/bucket/" + parametros["image_path"]
-
-    elif "GITHUB_ACTIONS" in os.environ:
-        workspace = os.environ["GITHUB_WORKSPACE"]
-        parametros["output_prefix"] = os.path.join(
-            workspace, "salida_procesos"
-        )
-        parametros["image_path"] = os.path.join(
-            workspace, parametros["image_path"]
-        )
-
-    else:
-        parametros["output_prefix"] = (
-            r"C:/Users/Camilo/Desktop/cosas_astronomia/salida_procesos/"
-        )
+    _= configurar_entrada_y_salida(parametros, "image_path")
 
     resultado = crop_image(**parametros)
     return jsonify(resultado)
@@ -134,38 +114,47 @@ def ruta_comparar_imagenes():
     parametros = request.get_json()
 
     if "K_SERVICE" in os.environ:
-        # Cloud Run: las imágenes están bajo /mnt/bucket.
-        parametros["top_image_path"] = os.path.join(
-            "/mnt/bucket",
-            parametros["top_image_path"]
-        )
-        parametros["bottom_image_path"] = os.path.join(
-            "/mnt/bucket",
-            parametros["bottom_image_path"]
-        )
-        parametros["output_prefix"] = "/mnt/bucket/salida_procesos/"
-
+        raiz = "/mnt/bucket"
     elif "GITHUB_ACTIONS" in os.environ:
-        # GitHub Actions: las imágenes están bajo GITHUB_WORKSPACE.
-        workspace = os.environ["GITHUB_WORKSPACE"]
-
-        parametros["top_image_path"] = os.path.join(
-            workspace,
-            parametros["top_image_path"]
-        )
-        parametros["bottom_image_path"] = os.path.join(
-            workspace,
-            parametros["bottom_image_path"]
-        )
-        parametros["output_prefix"] = os.path.join(
-            workspace,
-            "salida_procesos"
-        )
-
+        raiz = os.environ["GITHUB_WORKSPACE"]
     else:
-        # PC local: conserva las rutas de entrada recibidas en el JSON.
+        raiz = None
+
+    if raiz is not None:
+        # Las rutas del payload son relativas a la raíz del volumen.
+        # Se conservan así para calcular la carpeta de salida.
+        top_path = parametros["top_image_path"]
+        bottom_path = parametros["bottom_image_path"]
+        
+        # Resolver las rutas locales de entrada sin cambiar sus rutas relativas.
+        parametros["top_image_path"] = os.path.join(raiz, top_path)
+        parametros["bottom_image_path"] = os.path.join(raiz, bottom_path)
+        
+        # Si la imagen superior viene de una operación anterior, su ruta será
+        # "salida_procesos/carpeta/imagen.png". Para la nueva salida usamos
+        # solo "carpeta", evitando duplicar "salida_procesos".
+        ruta_top_normalizada = os.path.normpath(top_path).replace("\\", "/")
+        partes_top = ruta_top_normalizada.split("/")
+        
+        if partes_top[0] == "salida_procesos":
+            partes_carpeta = partes_top[1:-1]
+        else:
+            partes_carpeta = partes_top[:-1]
+        
+        carpeta_relativa = (
+            os.path.join(*partes_carpeta)
+            if partes_carpeta
+            else ""
+        )
+        
+        parametros["output_prefix"] = os.path.join(
+            raiz,
+            "salida_procesos",
+            carpeta_relativa
+        )
+    else:
         parametros["output_prefix"] = (
-            r"C:/Users/Camilo/Desktop/cosas_astronomia/salida_procesos/"
+            r"C:/Users/Camilo/Desktop/cosas_astronomia/salida_procesos"
         )
 
     resultado = combine_images(**parametros)

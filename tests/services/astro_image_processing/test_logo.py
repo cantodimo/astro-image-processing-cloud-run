@@ -5,16 +5,11 @@ import pytest
 from google.cloud import storage
 
 from servicios.astro_image_processing.app import app
-from tests.services.astro_image_processing.test_utils import preparar_entrada
+from tests.services.astro_image_processing.test_utils import (
+    preparar_entrada,
+    carpeta_de_salida,
+)
 import json
-
-#def preparar_entrada_logo(payload= json.loads(os.environ["LOGO_PAYLOAD"])):
-#    payload= preparar_entrada(payload, "base_path")
-#
-#    payload= preparar_entrada(payload, "logo_path")
-
-#    return payload
-
 
 def ejecutar_logo(payload):
     client = app.test_client()
@@ -29,9 +24,12 @@ def ejecutar_logo(payload):
     filename = os.path.basename(payload["base_path"])
     filename_without_extension = os.path.splitext(filename)[0]
 
+    carpeta_relativa = carpeta_de_salida(payload["base_path"])
+
     output = os.path.join(
         os.environ["GITHUB_WORKSPACE"],
         "salida_procesos",
+        carpeta_relativa,
         f"{filename_without_extension}_con_logo.png"
     )
 

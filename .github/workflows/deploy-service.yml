@@ -209,7 +209,7 @@ jobs:
         run: |
           if compgen -G "$GITHUB_WORKSPACE/salida_procesos/*" > /dev/null; then
 
-            gcloud storage cp \
+            gcloud storage cp --recursive\
               "$GITHUB_WORKSPACE/salida_procesos/"* \
               "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/salida_procesos_github_actions/"
 
@@ -274,14 +274,17 @@ jobs:
           mkdir -p salida_procesos
 
       - name: Download test image
-        working-directory: servicios/astro_image_processing
         run: |
           TEST_IMAGE=$(echo "$LOGO_PAYLOAD" | jq -r '.base_path')
-          local_image="${TEST_IMAGE//\//___}"
+          LOCAL_IMAGE="$GITHUB_WORKSPACE/$TEST_IMAGE"
 
+          # Crear la carpeta local correspondiente a la ruta del volumen.
+          mkdir -p "$(dirname "$LOCAL_IMAGE")"
+
+          # Descargar conservando la misma estructura de carpetas.
           gcloud storage cp \
             "gs://$GCP_BUCKET_VOLUME/volume-cloud-run/$TEST_IMAGE" \
-            "$GITHUB_WORKSPACE/$local_image"
+            "$LOCAL_IMAGE"
 
       - name: Download logo
         run: |
@@ -312,33 +315,25 @@ jobs:
       - name: Run Docker image processing test
         working-directory: servicios/astro_image_processing
         run: |
-          TEST_IMAGE=$(echo "$LOGO_PAYLOAD" | jq -r '.base_path')
-          local_image="${TEST_IMAGE//\//___}"
-
-          logo_payload=$(echo "$LOGO_PAYLOAD" | jq \
-            --arg image "$local_image" \
-            '.base_path = $image')
-
+          # El payload conserva la ruta relativa original del volumen.
           curl --fail --show-error --request POST \
             --header "Content-Type: application/json" \
-            --data "$logo_payload" \
+            --data "$LOGO_PAYLOAD" \
             http://localhost:8080/agregar_logo_a_imagen
 
       - name: Verify Docker output
-        working-directory: servicios/astro_image_processing
         run: |
           TEST_IMAGE=$(echo "$LOGO_PAYLOAD" | jq -r '.base_path')
-          local_image="${TEST_IMAGE//\//___}"
+          IMAGE_DIRECTORY=$(dirname "$TEST_IMAGE")
+          IMAGE_FILENAME=$(basename "$TEST_IMAGE")
+          FILENAME_WITHOUT_EXTENSION="${IMAGE_FILENAME%.*}"
 
-          filename=$(basename "$local_image")
-          filename_without_extension="${filename%.*}"
+          OUTPUT="$GITHUB_WORKSPACE/salida_procesos/$IMAGE_DIRECTORY/${FILENAME_WITHOUT_EXTENSION}_con_logo.png"
 
-          output="$GITHUB_WORKSPACE/salida_procesos/${filename_without_extension}_con_logo.png"
-
-          test -f "$output"
+          test -f "$OUTPUT"
 
           echo "Prueba Docker exitosa"
-          echo "Archivo generado: $output"
+          echo "Archivo generado: $OUTPUT"
 
       - name: Push Docker image to Artifact Registry
         working-directory: servicios/astro_image_processing

@@ -4,7 +4,10 @@ import os
 import pytest
 
 from servicios.astro_image_processing.app import app
-from tests.services.astro_image_processing.test_utils import preparar_entrada
+from tests.services.astro_image_processing.test_utils import (
+    preparar_entrada,
+    carpeta_de_salida,
+)
 
 
 def ejecutar_comparar(payload):
@@ -25,9 +28,12 @@ def ejecutar_comparar(payload):
         os.path.basename(payload["bottom_image_path"])
     )[0]
 
+    carpeta_relativa = carpeta_de_salida(payload["top_image_path"])
+
     output = os.path.join(
         os.environ["GITHUB_WORKSPACE"],
         "salida_procesos",
+        carpeta_relativa,
         f"{top_filename}_sobre_{bottom_filename}.png"
     )
 
