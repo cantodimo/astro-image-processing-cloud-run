@@ -407,7 +407,7 @@ jobs:
       - name: Terraform Apply
         run: |
           terraform apply \
-            -target=google_cloud_run_v2_job.astro_image_processing \
+            -target=google_cloud_run_v2_service.astro_image_processing \
             -auto-approve
         env:
           TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}

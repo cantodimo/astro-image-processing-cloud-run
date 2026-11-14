@@ -5,11 +5,11 @@
         "solo_test": "true",
         "endpoint": "texto",
         "texto_payload": {
-            "image_path": "camping.jpg",
-            "text": "Prueba de Texto en imagen.",
+            "image_path": "2026-11-08_ngc225_forma_C/IMG_20261108_212119_reescalada_con_logo_con_texto.png",
+            "text": "32x, iso 6400, 0.5seg",
             "fontsize": 0.03,
             "color": "skyblue",
-            "position": ["center", "top"],
+            "position": ["center", "bottom"],
             "margin": 0.05,
             "max_width_pct": 0.92,
             "font_path": "CrayonLibre-Regular.ttf"

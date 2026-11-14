@@ -1,0 +1,36 @@
+{
+    "workflow": "deploy-service.yml",
+    "branch": "dev",
+    "inputs": {
+        "solo_test": "true",
+        "endpoint": "integracion",
+        "integration_steps": "[\"reescalar\", \"logo\", \"texto\"]",
+        "reescalar_payload": {
+            "image_path": "2026-11-08_ngc225_forma_C/IMG_20261108_212119.jpg",
+            "target_width": 1440,
+            "target_height": 1800,
+            "mode": "pad",
+            "crop_offset_pct": 0
+        },
+        "logo_payload": {
+            "base_path": "xx",
+            "scale": 0.25,
+            "opacity": 0.60,
+            "margin": 0.02,
+            "tolerance": 60,
+            "bg_color": null,
+            "position": "right",
+            "logo_path":"imagenes_base/prueba_logotipo.png"
+        },
+        "texto_payload": {
+            "image_path": "yyy",
+            "text": "cumulo NGC 225 con forma de una C ",
+            "fontsize": 0.03,
+            "color": "skyblue",
+            "position": ["center", "top"],
+            "margin": 0.05,
+            "max_width_pct": 0.92,
+            "font_path": "CrayonLibre-Regular.ttf"
+        }
+    }
+}
